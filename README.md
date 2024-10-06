@@ -1,6 +1,6 @@
 # Img2Palette
 
-A simple python application that generates a color palette from an image.
+A simple program that generates a color palette from an image.
 
 ## Features
 
@@ -9,15 +9,6 @@ A simple python application that generates a color palette from an image.
 * Palettes are sorted by their perceptual color difference.
 * Palettes are outputted as a PNG file (3x3px swatch size)
 
-## Requirements
+## Notes
 
-* Python 3.x
-* tkinter
-* Pillow (PIL)
-* scikit-image
-* numpy
-
-You can install these dependencies using pip:
-
-```bash
-pip install tkinter Pillow scikit-image numpy
+Use arrow keys / click within the trough to fine tune the slider position.
