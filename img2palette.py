@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog, Scale, Frame, Label, Button, HORIZONTAL
+from tkinter import filedialog, Frame, Label, Button, Scale, HORIZONTAL
 from PIL import Image, ImageTk
 from skimage import color
 from skimage.color import deltaE_ciede2000
@@ -18,10 +18,11 @@ class Img2Palette:
         self.root.title("Img2Palette")
         self.root.geometry("250x420")
         self.root.resizable(False, False)
-        self.image_frame = Frame(self.root, height=250)
-        self.image_frame.pack()
-        self.img_label = Label(self.root)
-        self.img_label.pack()
+        self.image_frame = Frame(self.root, width=256, height=256)
+        self.image_frame.pack_propagate(False)
+        self.image_frame.pack(pady=5)
+        self.img_label = Label(self.image_frame)
+        self.img_label.pack(expand=True)
         Button(self.root, text="Select Image", command=self.get_image).pack(pady=5)
         Label(self.root, text="Colors in Palette:").pack(pady=(5, 0))
         self.scale = Scale(self.root, from_=1, to=256, orient=HORIZONTAL, highlightthickness=0)
@@ -38,11 +39,10 @@ class Img2Palette:
         if not self.file_path:
             return
         self.img = Image.open(self.file_path).convert('RGB')
+        self.img.thumbnail((256, 256), Image.Resampling.LANCZOS)
         colors = np.array(self.img).reshape(-1, 3)
         max_colors = min(len(np.unique(colors, axis=0)), 256)
         self.scale.config(to=max_colors)
-        self.img.thumbnail((250, 250), Image.Resampling.LANCZOS)
-        self.image_frame.pack_forget()
         self.img_preview = ImageTk.PhotoImage(self.img)
         self.img_label.config(image=self.img_preview)  # type: ignore
 
@@ -70,7 +70,7 @@ class Img2Palette:
         if self.file_path is None:
             print("Please select an image first.")
             return
-        swatchsize = 3
+        swatchsize = 3 # change this for output swatch size (px)
         self.palette = Image.new('RGB', (swatchsize * num_colors, swatchsize))
         for i, col in enumerate(sorted_colors):
             col_int = tuple(map(lambda x: int(round(x * 255)), col))
