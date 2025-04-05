@@ -4,7 +4,7 @@ Img2Palette: A simple tool to extract color palettes from images.
 
 from .img2palette import Img2Palette, main
 
-__version__ = "1.1.1"
+__version__ = "1.1.2"
 __version_info__ = (1, 1, 2)
 __author__ = "grinnch"
 __license__ = "MIT"
