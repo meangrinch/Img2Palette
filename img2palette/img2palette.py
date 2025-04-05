@@ -26,7 +26,7 @@ class Img2Palette:
         self.img = None
         self.palette = None
         self.file_path = None
-        self.last_preview_window = None
+        self.preview_window = None
         self.setup_ui()
 
     def setup_ui(self):
@@ -87,6 +87,7 @@ class Img2Palette:
         """
         cpu_count = int(os.cpu_count() / 2)
         os.environ['LOKY_MAX_CPU_COUNT'] = str(cpu_count)
+        
         img_small = image.resize((100, 100))
         pixels = np.array(img_small).reshape(-1, 3)
         kmeans = KMeans(n_clusters=num_colors, random_state=0, n_init=10).fit(pixels)
@@ -153,8 +154,14 @@ class Img2Palette:
             return "break"
         return handler
 
+    def on_preview_close(self):
+        """Handle the closing of the preview window."""
+        if self.preview_window:
+            self.preview_window.destroy()
+        self.preview_window = None
+
     def preview_palette(self):
-        """Generate and display a preview of the color palette."""
+        """Generate and display a preview of the color palette, reusing the window and wrapping colors."""
         if self.img is None:
             print("Please select an image first.")
             return
@@ -166,58 +173,63 @@ class Img2Palette:
             print(f"Error generating palette: {e}")
             tk.messagebox.showerror("Error", f"Could not generate palette.\n{e}")
             return
+        
+        MAX_PREVIEW_WIDTH = 512 # Max preview width
+        SWATCH_WIDTH = 32
+        SWATCH_HEIGHT = 32
+        swatches_per_row = max(1, MAX_PREVIEW_WIDTH // SWATCH_WIDTH)
+        num_rows = (num_colors + swatches_per_row - 1) // swatches_per_row
+        actual_preview_width = min(MAX_PREVIEW_WIDTH, num_colors * SWATCH_WIDTH)
+        if num_colors > 0:
+            actual_preview_width = max(SWATCH_WIDTH, actual_preview_width)
+        else:
+            actual_preview_width = SWATCH_WIDTH
+        preview_height = num_rows * SWATCH_HEIGHT
+        if num_colors > 0:
+             preview_height = max(SWATCH_HEIGHT, preview_height)
+        else:
+             preview_height = SWATCH_HEIGHT
 
-        preview_window = Toplevel(self.root)
-        preview_window.title("Palette Preview")
-        preview_width = max(60, 20 * num_colors)
-        preview_height = 40
-        preview_window.geometry(f"{preview_width}x{preview_height}")
-        preview_window.resizable(False, False)
+        if self.preview_window and self.preview_window.winfo_exists():
+            canvas = self.preview_window.winfo_children()[0]
+            canvas.delete("all")
+            self.preview_window.geometry(f"{actual_preview_width}x{preview_height}")
+            canvas.config(width=actual_preview_width, height=preview_height)
+            self.preview_window.lift()
+            self.preview_window.focus_set()
+        else:
+            self.preview_window = Toplevel(self.root)
+            self.preview_window.title("Palette Preview")
+            self.preview_window.geometry(f"{actual_preview_width}x{preview_height}")
+            self.preview_window.resizable(False, False)
+            self.preview_window.transient(self.root)
+            self.preview_window.protocol("WM_DELETE_WINDOW", self.on_preview_close)
+            
+            canvas = tk.Canvas(self.preview_window, width=actual_preview_width, height=preview_height, bd=0, highlightthickness=0)
+            canvas.pack()
+            self.root.update_idletasks()
+            main_x = self.root.winfo_x()
+            main_y = self.root.winfo_y()
+            main_w = self.root.winfo_width()
+            new_x = main_x + main_w + 5 # add small gap
+            new_y = main_y
+            self.preview_window.geometry(f'+{new_x}+{new_y}')
+            self.preview_window.focus_set()
 
-        canvas = tk.Canvas(preview_window, width=preview_width, height=preview_height, bd=0, highlightthickness=0)
-        canvas.pack()
-
-        swatch_width = 20
+        canvas = self.preview_window.winfo_children()[0]
         for i, col_01 in enumerate(sorted_rgb_01):
             col_hex = '#{:02x}{:02x}{:02x}'.format(
                 int(round(col_01[0] * 255)),
                 int(round(col_01[1] * 255)),
                 int(round(col_01[2] * 255))
             )
-            canvas.create_rectangle(i * swatch_width, 0, min((i + 1) * swatch_width, preview_width), preview_height, fill=col_hex, outline=col_hex)
-
-        self.root.update_idletasks()
-        preview_window.update_idletasks()
-
-        new_x, new_y = 0, 0
-        try:
-            if self.last_preview_window and self.last_preview_window.winfo_exists():
-                last_x = self.last_preview_window.winfo_x()
-                last_y = self.last_preview_window.winfo_y()
-                last_h = self.last_preview_window.winfo_height()
-                new_x = last_x
-                new_y = last_y + last_h + 30
-            else:
-                main_x = self.root.winfo_x()
-                main_y = self.root.winfo_y()
-                main_w = self.root.winfo_width()
-                new_x = main_x + main_w + 3
-                new_y = main_y + 5
-                self.last_preview_window = None
-        except tk.TclError:
-             main_x = self.root.winfo_x()
-             main_y = self.root.winfo_y()
-             main_w = self.root.winfo_width()
-             new_x = main_x + main_w + 3
-             new_y = main_y + 5
-             self.last_preview_window = None
-
-        preview_window.geometry(f'+{new_x}+{new_y}')
-        preview_window.transient(self.root)
-        preview_window.focus_set()
-
-        self.last_preview_window = preview_window
-        preview_window.wait_window()
+            row = i // swatches_per_row
+            col = i % swatches_per_row
+            x1 = col * SWATCH_WIDTH
+            y1 = row * SWATCH_HEIGHT
+            x2 = x1 + SWATCH_WIDTH
+            y2 = y1 + SWATCH_HEIGHT
+            canvas.create_rectangle(x1, y1, x2, y2, fill=col_hex, outline='')
 
 def main():
     """Start the application."""
