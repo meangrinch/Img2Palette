@@ -8,17 +8,19 @@ from sklearn.cluster import KMeans
 from skimage import color
 from skimage.color import deltaE_ciede2000
 
+
 class Img2Palette:
     """
     Main application class for extracting color palettes from images.
-    
+
     Provides functionality to load images, extract dominant colors,
     preview and save color palettes sorted by perceptual similarity.
     """
+
     def __init__(self, root):
         """
         Initialize the application with a tkinter root window.
-        
+
         Args:
             root: The tkinter root window
         """
@@ -56,7 +58,7 @@ class Img2Palette:
         self.file_path = filedialog.askopenfilename()
         if not self.file_path:
             return
-        self.img = Image.open(self.file_path).convert('RGB')
+        self.img = Image.open(self.file_path).convert("RGB")
         self.img.thumbnail((256, 256), Image.Resampling.LANCZOS)
         colors = np.array(self.img).reshape(-1, 3)
         max_colors = min(len(np.unique(colors, axis=0)), 256)
@@ -77,17 +79,17 @@ class Img2Palette:
     def _extract_colors_kmeans(self, image, num_colors):
         """
         Extract dominant colors using KMeans clustering.
-        
+
         Args:
             image: PIL Image object
             num_colors: Number of colors to extract
-            
+
         Returns:
             Array of RGB color values (0-255)
         """
         cpu_count = int(os.cpu_count() / 2)
-        os.environ['LOKY_MAX_CPU_COUNT'] = str(cpu_count)
-        
+        os.environ["LOKY_MAX_CPU_COUNT"] = str(cpu_count)
+
         img_small = image.resize((100, 100))
         pixels = np.array(img_small).reshape(-1, 3)
         kmeans = KMeans(n_clusters=num_colors, random_state=0, n_init=10).fit(pixels)
@@ -96,29 +98,29 @@ class Img2Palette:
     def _sort_colors_by_lab(self, rgb_colors_255):
         """
         Sort colors by perceptual similarity in LAB color space.
-        
+
         Args:
             rgb_colors_255: Array of RGB colors (0-255)
-            
+
         Returns:
             Array of sorted RGB colors (0-1)
         """
-        lab_colors = [color.rgb2lab(np.array([[col/255.0]]))[0][0] for col in rgb_colors_255]
+        lab_colors = [color.rgb2lab(np.array([[col / 255.0]]))[0][0] for col in rgb_colors_255]
         lab_colors.sort(key=lambda x: x[0])
-        
+
         sorted_lab_colors = [lab_colors.pop(0)]
         while lab_colors:
             last_color = sorted_lab_colors[-1]
             distances = [deltaE_ciede2000(last_color, lab_color) for lab_color in lab_colors]
             next_color_index = np.argmin(distances)
             sorted_lab_colors.append(lab_colors.pop(next_color_index))
-            
+
         return [color.lab2rgb(np.array([[lab_col]]))[0][0] for lab_col in sorted_lab_colors]
 
     def _save_palette(self, sorted_colors, num_colors):
         """
         Create and save the color palette image.
-        
+
         Args:
             sorted_colors: Array of RGB colors (0-1)
             num_colors: Number of colors in the palette
@@ -127,7 +129,7 @@ class Img2Palette:
             print("Please select an image first.")
             return
         swatchsize = 3
-        self.palette = Image.new('RGB', (swatchsize * num_colors, swatchsize))
+        self.palette = Image.new("RGB", (swatchsize * num_colors, swatchsize))
         for i, col in enumerate(sorted_colors):
             col_int = tuple(map(lambda x: int(round(x * 255)), col))
             self.palette.paste(col_int, (i * swatchsize, 0, (i + 1) * swatchsize, swatchsize))
@@ -139,19 +141,21 @@ class Img2Palette:
     def change_scale(self, delta):
         """
         Create a handler for changing the scale value with arrow keys.
-        
+
         Args:
             delta: Amount to change the scale value
-            
+
         Returns:
             Event handler function
         """
+
         def handler(event):
             current_value = self.scale.get()
             new_value = current_value + delta
             if self.scale.cget("from") <= new_value <= self.scale.cget("to"):
                 self.scale.set(new_value)
             return "break"
+
         return handler
 
     def on_preview_close(self):
@@ -173,8 +177,8 @@ class Img2Palette:
             print(f"Error generating palette: {e}")
             tk.messagebox.showerror("Error", f"Could not generate palette.\n{e}")
             return
-        
-        MAX_PREVIEW_WIDTH = 512 # Max preview width
+
+        MAX_PREVIEW_WIDTH = 512  # Max preview width
         SWATCH_WIDTH = 32
         SWATCH_HEIGHT = 32
         swatches_per_row = max(1, MAX_PREVIEW_WIDTH // SWATCH_WIDTH)
@@ -186,9 +190,9 @@ class Img2Palette:
             actual_preview_width = SWATCH_WIDTH
         preview_height = num_rows * SWATCH_HEIGHT
         if num_colors > 0:
-             preview_height = max(SWATCH_HEIGHT, preview_height)
+            preview_height = max(SWATCH_HEIGHT, preview_height)
         else:
-             preview_height = SWATCH_HEIGHT
+            preview_height = SWATCH_HEIGHT
 
         if self.preview_window and self.preview_window.winfo_exists():
             canvas = self.preview_window.winfo_children()[0]
@@ -204,24 +208,24 @@ class Img2Palette:
             self.preview_window.resizable(False, False)
             self.preview_window.transient(self.root)
             self.preview_window.protocol("WM_DELETE_WINDOW", self.on_preview_close)
-            
-            canvas = tk.Canvas(self.preview_window, width=actual_preview_width, height=preview_height, bd=0, highlightthickness=0)
+
+            canvas = tk.Canvas(
+                self.preview_window, width=actual_preview_width, height=preview_height, bd=0, highlightthickness=0
+            )
             canvas.pack()
             self.root.update_idletasks()
             main_x = self.root.winfo_x()
             main_y = self.root.winfo_y()
             main_w = self.root.winfo_width()
-            new_x = main_x + main_w + 5 # add small gap
+            new_x = main_x + main_w + 5  # add small gap
             new_y = main_y
-            self.preview_window.geometry(f'+{new_x}+{new_y}')
+            self.preview_window.geometry(f"+{new_x}+{new_y}")
             self.preview_window.focus_set()
 
         canvas = self.preview_window.winfo_children()[0]
         for i, col_01 in enumerate(sorted_rgb_01):
-            col_hex = '#{:02x}{:02x}{:02x}'.format(
-                int(round(col_01[0] * 255)),
-                int(round(col_01[1] * 255)),
-                int(round(col_01[2] * 255))
+            col_hex = "#{:02x}{:02x}{:02x}".format(
+                int(round(col_01[0] * 255)), int(round(col_01[1] * 255)), int(round(col_01[2] * 255))
             )
             row = i // swatches_per_row
             col = i % swatches_per_row
@@ -229,15 +233,25 @@ class Img2Palette:
             y1 = row * SWATCH_HEIGHT
             x2 = x1 + SWATCH_WIDTH
             y2 = y1 + SWATCH_HEIGHT
-            canvas.create_rectangle(x1, y1, x2, y2, fill=col_hex, outline='')
+            canvas.create_rectangle(x1, y1, x2, y2, fill=col_hex, outline="")
+
 
 def main():
     """Start the application."""
     root = tk.Tk()
-    icon_data = "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAeUExURRMDEB0FGCcHITwJIVILIH0PH6gUHdMYHP8lK////9UYX/kAAAABYktHRAnx2aXsAAAAB3RJTUUH5wQXAzoaJVbRJgAAAChJREFUCNdjYGBgFBQUUlJiIIZhbGzi4uIaGkoaIy0tvby8oqODGAYAKiohEXlZcJwAAAAldEVYdGRhdGU6Y3JlYXRlADIwMjMtMDQtMjNUMDM6NTg6MjUrMDA6MDDuL0rHAAAAJXRFWHRkYXRlOm1vZGlmeQAyMDIzLTA0LTIzVDAzOjU4OjI1KzAwOjAwn3LyewAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyMy0wNC0yM1QwMzo1ODoyNiswMDowMPmPyTkAAAAASUVORK5CYII="
+    icon_data = (
+        "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAIGNIUk0AAHomAACAhAAA"
+        "+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAeUExURRMDEB0FGCcHITwJIVILIH0P"
+        "H6gUHdMYHP8lK////9UYX/kAAAABYktHRAnx2aXsAAAAB3RJTUUH5wQXAzoaJVbRJgAA"
+        "AChJREFUCNdjYGBgFBQUUlJiIIZhbGzi4uIaGkoaIy0tvby8oqODGAYAKiohEXlZcJwA"
+        "AAAldEVYdGRhdGU6Y3JlYXRlADIwMjMtMDQtMjNUMDM6NTg6MjUrMDA6MDDuL0rHAAAA"
+        "JXRFWHRkYXRlOm1vZGlmeQAyMDIzLTA0LTIzVDAzOjU4OjI1KzAwOjAwn3LyewAAACh0"
+        "RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyMy0wNC0yM1QwMzo1ODoyNiswMDowMPmPyTkAAAAA"
+        "SUVORK5CYII="
+    )
     icon = tk.PhotoImage(data=icon_data)
     root.iconphoto(True, icon)
-    app = Img2Palette(root)
+    Img2Palette(root)
     root.update_idletasks()
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
@@ -245,8 +259,9 @@ def main():
     window_height = root.winfo_height()
     x = (screen_width // 2) - (window_width // 2)
     y = (screen_height // 2) - (window_height // 2)
-    root.geometry(f'{window_width}x{window_height}+{x}+{y}')
+    root.geometry(f"{window_width}x{window_height}+{x}+{y}")
     root.mainloop()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
