@@ -3,6 +3,7 @@
 A simple program that generates a color palette from an image.
 
 ![Screenshot](docs/images/example_1.png)
+
 ![Screenshot](docs/images/example_2.png)
 
 ## Features
