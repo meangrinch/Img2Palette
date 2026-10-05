@@ -16,18 +16,12 @@ A browser-based tool for extracting color palettes from images. Runs client-side
 
 <br/>
 
-<div align="center">
-  <table>
-    <tr>
-      <th style="text-align: center">Original</th>
-      <th style="text-align: center">Extracted Palette</th>
-    </tr>
-    <tr>
-      <td><img src="docs/images/example_original.jpg" width="400" /></td>
-      <td><img src="docs/images/example_palette.png" width="400" /></td>
-    </tr>
-  </table>
-</div>
+<p align="center">
+  <img src="docs/images/example_original.jpg" width="400" alt="Original" />
+  <img src="docs/images/example_palette.png" width="400" alt="Extracted Palette" />
+  <br/>
+  <sub>Original → Extracted Palette</sub>
+</p>
 
 ---
 
