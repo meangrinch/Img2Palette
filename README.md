@@ -47,11 +47,11 @@ python scripts/build.py
 
 ## Features
 
-- **Extraction**: Extract 1 to 256 colors from images with K-Means++, Wu, or Median Cut, preserving small accent colors
+- **Extraction**: Extract 1 to 256 colors from images with Wu, K-Means++, or Median Cut, preserving small accent colors
 - **Sorting**: Order palettes into smooth color gradients while preserving locked swatches
 - **Organization**: Arrange swatches by hue spectrum or lightness with separated neutral tones
 - **Swatch Editor**: Click to copy hex codes, lock favorite colors, edit or remove swatches, and sample new ones with the eyedropper
-- **Preview**: Compare the image and palette side by side or view the palette alone, with an eyedropper loupe and up to 3200% zoom
+- **Preview**: Compare the image and palette with a side-by-side view, palette-only view, eyedropper loupe, pixel grid overlay, and up to 3200% zoom
 - **Export**: Save as PNG swatches (strip, grid, or preview layout), JSON, GPL, CSS variables, or hex lists, or copy to the clipboard
 
 ---
