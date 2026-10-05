@@ -1,0 +1,2420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="version" content="{{VERSION}}">
+  <title>Img2Palette</title>
+  <meta name="description" content="Extract color palettes from images directly in your browser. Fast, lightweight, offline.">
+  <link rel="icon" type="image/png" href="{{LOGO_B64}}">
+  <style>
+    :root {
+      /* Original purple-slate Dark (Default), coral accent */
+      --bg-desktop: #14121c;
+      --bg-main: #1c1a26;
+      --bg-panel: #23202e;
+      --bg-header: #2b2738;
+      --bg-header-hover: #373247;
+      --bg-card: #2b2738;
+      --bg-card-hover: #373247;
+      --bg-input: #171520;
+      --bg-well: #171520;
+      --text-well: #f5f2eb;
+      --border-color: #14121c;
+      --border-focus: #f87171;
+      --border-light: #443e56;
+      --border-dark: #14121c;
+      --titlebar-bg: #2b2738;
+      --titlebar-text: #f5f2eb;
+      --text-main: #f5f2eb;
+      --text-muted: #958fa3;
+      --text-disabled: #5a5468;
+      --text-highlight: #f87171;
+      --accent: #f87171;
+      --accent-hover: #fca5a5;
+      --accent-text: #171520;
+      --accent-glow: transparent;
+      --btn-bg: #383347;
+      --btn-hover: #453f57;
+      --btn-active: #1a1824;
+      --bg-tab: #1e1c28;
+      --bg-viewport: #181622;
+      --checker-color: #242232;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --shadow-soft: 0 1px 3px rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.18);
+      --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", system-ui, sans-serif;
+      --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+
+    [data-theme="light"] {
+      /* Neutral cool-grey Light (off-white, not pure white) */
+      --bg-desktop: #d2d2d8;
+      --bg-main: #e6e6eb;
+      --bg-panel: #f1f1f4;
+      --bg-header: #e9e9ee;
+      --bg-header-hover: #dfdfe5;
+      --bg-card: #f6f6f8;
+      --bg-card-hover: #ebebf0;
+      --bg-input: #fafafb;
+      --bg-well: #fafafb;
+      --text-well: #1d1d23;
+      --border-color: #cfcfd7;
+      --border-focus: #b91c1c;
+      --border-light: #ffffff;
+      --border-dark: #cfcfd7;
+      --titlebar-bg: #e9e9ee;
+      --titlebar-text: #1d1d23;
+      --text-main: #1d1d23;
+      --text-muted: #6a6a75;
+      --text-disabled: #a2a2ad;
+      --text-highlight: #b91c1c;
+      --accent: #b91c1c;
+      --accent-hover: #991b1b;
+      --accent-text: #ffffff;
+      --accent-glow: transparent;
+      --btn-bg: #e2e2e8;
+      --btn-hover: #ececf0;
+      --btn-active: #cdcdd5;
+      --bg-tab: #dadae0;
+      --bg-viewport: #f7f7f9;
+      --checker-color: #e8e8ed;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    /* Component display rules would otherwise override the hidden attribute */
+    [hidden] { display: none !important; }
+
+    body {
+      font-family: var(--font-ui);
+      background: var(--bg-main);
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+      font-size: 13px;
+    }
+
+    /* Top Navigation Header */
+    header {
+      height: 44px;
+      background: var(--bg-header);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      z-index: 20;
+    }
+    .logo-container { display: flex; align-items: center; gap: 8px; }
+    .logo-icon { width: 20px; height: 20px; object-fit: contain; image-rendering: pixelated; }
+    .logo-title { font-size: 14px; font-weight: 600; }
+    .version-tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+    .header-actions { display: flex; align-items: center; gap: 6px; }
+    .header-sep { width: 1px; height: 16px; background: var(--border-color); margin: 0 4px; }
+    .menu-wrap { position: relative; }
+    .dropdown {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: calc(100% + 6px);
+      min-width: 150px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-soft);
+      padding: 4px;
+      z-index: 40;
+    }
+    .dropdown.open { display: flex; flex-direction: column; }
+    .dropdown-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: none;
+      background: transparent;
+      color: var(--text-main);
+      font-family: var(--font-ui);
+      font-size: 13px;
+      text-align: left;
+      padding: 7px 10px;
+      border-radius: 7px;
+      cursor: pointer;
+    }
+    .dropdown-item:hover { background: rgba(120,120,128,.16); }
+
+    .btn {
+      font-family: var(--font-ui);
+      font-size: 13px;
+      background: var(--btn-bg);
+      color: var(--text-main);
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: background .12s ease;
+    }
+    .btn:hover { background: var(--btn-hover); }
+    .btn:active { background: var(--btn-active); }
+    .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .btn:disabled { opacity: .45; cursor: default; }
+    .btn:disabled:hover { background: var(--btn-bg); }
+    .btn-primary {
+      background: var(--accent);
+      color: var(--accent-text);
+      font-weight: 600;
+      border-radius: 999px;
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-icon {
+      width: 30px; height: 26px;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: transparent; border: none; border-radius: 7px;
+      color: var(--text-main); cursor: pointer; padding: 0;
+    }
+    .btn-icon:hover { background: rgba(120,120,128,.16); }
+    .btn-icon:disabled { opacity: .35; cursor: default; }
+    .btn-icon:disabled:hover { background: transparent; }
+    .btn-icon svg, .btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .btn-tool { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 12px; }
+    .btn-tool.active { background: var(--accent); color: var(--accent-text); }
+    .btn-tool:disabled { opacity: .4; cursor: default; }
+    .btn-tool:disabled:hover { background: var(--btn-bg); }
+
+    .view-mode-tabs {
+      display: inline-flex;
+      background: rgba(120,120,128,.14);
+      border-radius: 9px;
+      padding: 2px;
+      gap: 2px;
+    }
+    .tab-btn {
+      border: none;
+      background: transparent;
+      color: var(--text-main);
+      font-family: var(--font-ui);
+      font-size: 12px;
+      padding: 4px 12px;
+      border-radius: 7px;
+      cursor: pointer;
+      opacity: .65;
+    }
+    .tab-btn.active {
+      background: var(--bg-panel);
+      box-shadow: 0 1px 3px rgba(0,0,0,.2);
+      opacity: 1;
+      font-weight: 600;
+    }
+    .btn-row { display: flex; gap: 6px; }
+    .btn-row .btn { flex: 1; padding: 6px 8px; font-size: 12px; }
+
+    /* Main Studio Layout */
+    .studio-container {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+      position: relative;
+    }
+    .inspector {
+      order: 2;
+      width: 300px;
+      min-width: 260px;
+      background: var(--bg-panel);
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .insp-seg { padding: 10px 12px 0; }
+    .inspector-panels {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+    .inspector-panel { display: none; flex-direction: column; gap: 14px; }
+    .inspector-panel.active { display: flex; }
+    .insp-group-title {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .4px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    .form-hint { font-size: 11px; color: var(--text-muted); line-height: 1.45; }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .form-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .form-label { font-size: 13px; font-weight: 600; }
+    .form-val-input {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      color: var(--text-highlight);
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 5px;
+      width: 52px;
+      text-align: right;
+      padding: 1px 4px;
+    }
+    .form-val-input:hover { border-color: var(--border-color); }
+    .form-val-input:focus { outline: none; border-color: var(--accent); background: var(--bg-input); }
+    .form-val-input::-webkit-outer-spin-button,
+    .form-val-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .form-val-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 4px;
+      background: rgba(120,120,128,.28);
+      border-radius: 2px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 1px 4px rgba(0,0,0,.35);
+      cursor: pointer;
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 14px; height: 14px;
+      border: none;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 1px 4px rgba(0,0,0,.35);
+      cursor: pointer;
+    }
+    select, input[type="text"], textarea {
+      font-family: var(--font-ui);
+      font-size: 12px;
+      color: var(--text-main);
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 6px 8px;
+      width: 100%;
+    }
+    select:focus, input[type="text"]:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    /* Themed dropdown lists where the browser allows styling the picker; others keep the native list */
+    @supports (appearance: base-select) {
+      select, ::picker(select) { appearance: base-select; }
+      select { display: flex; align-items: center; cursor: pointer; }
+      select::picker-icon {
+        color: var(--text-muted);
+        transition: rotate .15s ease;
+      }
+      select:open::picker-icon { rotate: 180deg; }
+      ::picker(select) {
+        margin-top: 4px;
+        max-height: min(360px, 60vh);
+        overflow-y: auto;
+        padding: 4px;
+        background: var(--bg-card);
+        color: var(--text-main);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-soft);
+        scrollbar-width: thin;
+        scrollbar-color: rgba(120,120,128,.4) transparent;
+      }
+      option {
+        padding: 6px 8px;
+        border-radius: 7px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      option:hover, option:focus-visible { background: rgba(120,120,128,.16); outline: none; }
+      option:checked { font-weight: 600; }
+      option::checkmark { color: var(--accent); }
+    }
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-main);
+      cursor: pointer;
+    }
+    .checkbox-label input[type="checkbox"] {
+      accent-color: var(--accent);
+      width: 14px; height: 14px;
+    }
+
+    .help-tip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px; height: 14px;
+      margin-left: 5px;
+      border-radius: 50%;
+      background: rgba(120,120,128,.18);
+      color: var(--text-muted);
+      font-size: 9px;
+      font-weight: 700;
+      cursor: help;
+      vertical-align: middle;
+    }
+    .help-tip:hover { background: var(--accent); color: var(--accent-text); }
+    .floating-tooltip {
+      display: none;
+      position: fixed;
+      z-index: 100;
+      max-width: 260px;
+      background: var(--bg-card);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-soft);
+      padding: 8px 10px;
+      font-size: 11px;
+      line-height: 1.45;
+      pointer-events: none;
+    }
+
+    /* Selection card and locked list */
+    .swatch-card {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: var(--bg-well);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 10px;
+    }
+    .swatch-meta {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .color-row { display: flex; gap: 6px; align-items: center; }
+    .color-row input[type="color"] { width: 36px; height: 26px; padding: 0; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: transparent; cursor: pointer; }
+    .color-row input[type="text"] { flex: 1; font-family: var(--font-mono); }
+    /* Six rows of chips, then scroll; stable gutter so the scrollbar doesn't change how many wrap */
+    .mini-chips { display: flex; flex-wrap: wrap; gap: 4px; max-height: 108px; overflow-y: auto; scrollbar-gutter: stable; padding: 2px; }
+    .chip {
+      width: 14px; height: 14px;
+      border-radius: 4px;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,.15);
+      flex-shrink: 0;
+    }
+    .locked-list { display: flex; flex-direction: column; gap: 4px; }
+    .locked-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 6px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+    .locked-item:hover { background: rgba(120,120,128,.16); }
+    .locked-item span { flex: 1; }
+    .locked-item .btn { padding: 2px 8px; font-size: 11px; }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 48px;
+      transform: translateX(-50%) translateY(8px);
+      background: var(--bg-card);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      border-radius: 999px;
+      box-shadow: var(--shadow-soft);
+      padding: 7px 16px;
+      font-size: 12px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease, transform .18s ease;
+      z-index: 90;
+    }
+    .toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    .segmented {
+      display: inline-flex;
+      background: rgba(120,120,128,.14);
+      border-radius: 9px;
+      padding: 2px;
+      gap: 2px;
+    }
+    .seg-btn {
+      border: none;
+      background: transparent;
+      color: var(--text-main);
+      font-family: var(--font-ui);
+      font-size: 12px;
+      padding: 4px 12px;
+      border-radius: 7px;
+      cursor: pointer;
+      opacity: .65;
+    }
+    .seg-btn.active {
+      background: var(--bg-panel);
+      box-shadow: 0 1px 3px rgba(0,0,0,.2);
+      opacity: 1;
+      font-weight: 600;
+    }
+
+    /* Canvas Viewport Stage */
+    .stage-container {
+      order: 1;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      min-width: 0;
+      background: var(--bg-main);
+      overflow: hidden;
+    }
+
+    /* Stage Toolbar */
+    .stage-toolbar {
+      height: 38px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .zoom-controls {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    #zoomLevelText { font-family: var(--font-mono); min-width: 44px; text-align: center; }
+    .zoom-controls .btn { padding: 3px 9px; font-size: 12px; }
+
+    /* Viewport Work Area */
+    .viewport-area {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      cursor: grab;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--bg-viewport);
+      background-image:
+        linear-gradient(45deg, var(--checker-color) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--checker-color) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--checker-color) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--checker-color) 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+    }
+    .viewport-area.panning { cursor: grabbing; }
+    .viewport-area.eyedropper-active { cursor: crosshair; }
+
+    canvas,
+    .side-by-side-wrap canvas,
+    .side-by-side-card canvas,
+    #mainCanvas {
+      display: block;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: -webkit-crisp-edges;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      -ms-interpolation-mode: nearest-neighbor;
+    }
+
+    /* Screen-space chrome: positioned from card rects in JS, never scaled with the zoom */
+    .view-label {
+      display: none;
+      position: absolute;
+      height: 24px;
+      line-height: 23px;
+      padding: 0 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      background: var(--bg-header);
+      color: var(--accent);
+      border-bottom: 1px solid var(--border-dark);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    /* Side-by-Side Mode */
+    .side-by-side-wrap {
+      position: absolute;
+      transform-origin: center center;
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      --zoom: 1;
+    }
+
+    .side-by-side-card {
+      background: var(--bg-panel);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Palette mosaic: card is sized to the image so both sides share one zoom */
+    .palette-matrix-grid {
+      display: grid;
+      width: 100%;
+      height: 100%;
+      background: var(--bg-well);
+    }
+    .palette-square-swatch {
+      position: relative;
+      cursor: pointer;
+    }
+    /* Divided by the zoom so outlines and lock marks stay a constant screen size */
+    .palette-square-swatch:hover {
+      outline: calc(2px / var(--zoom)) solid #ffffff;
+      outline-offset: calc(-2px / var(--zoom));
+      z-index: 1;
+    }
+    .palette-square-swatch.active {
+      outline: calc(3px / var(--zoom)) solid var(--accent);
+      outline-offset: calc(-3px / var(--zoom));
+      z-index: 2;
+    }
+    .palette-square-swatch.locked::after {
+      content: '';
+      position: absolute;
+      right: calc(4px / var(--zoom));
+      bottom: calc(4px / var(--zoom));
+      width: calc(8px / var(--zoom));
+      height: calc(8px / var(--zoom));
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 0 0 calc(1.5px / var(--zoom)) rgba(0,0,0,.6);
+      pointer-events: none;
+    }
+
+    /* Pixel Grid Overlay */
+    .pixel-grid-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      display: none;
+    }
+
+    /* Floating Eyedropper Magnifier */
+    .eyedropper-loupe {
+      display: none;
+      position: fixed;
+      pointer-events: none;
+      z-index: 80;
+      width: 148px;
+      flex-direction: column;
+      gap: 6px;
+      padding: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-soft);
+    }
+    .loupe-preview-box {
+      position: relative;
+      width: 90px;
+      height: 90px;
+      margin: 0 auto;
+      border-radius: var(--radius-sm);
+      background: var(--bg-well);
+      overflow: hidden;
+    }
+    .loupe-preview-box canvas { width: 100%; height: 100%; }
+    .loupe-crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 14px;
+      height: 14px;
+      transform: translate(-50%, -50%);
+      border: 1px solid #ffffff;
+      box-shadow: 0 0 0 1px #000000;
+      pointer-events: none;
+    }
+    .loupe-info { display: flex; align-items: center; gap: 6px; }
+    .loupe-info .chip { width: 22px; height: 22px; border-radius: 5px; }
+    .loupe-values {
+      display: flex;
+      flex-direction: column;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      line-height: 1.3;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .loupe-values b { color: var(--text-highlight); font-weight: 600; }
+
+    /* Bottom HUD / Status Bar */
+    .hud-bar {
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      border-top: 1px solid var(--border-color);
+      background: var(--bg-panel);
+    }
+    .hud-metrics { display: flex; gap: 6px; }
+    .status-panel,
+    .hud-credit {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 9px;
+      background: var(--bg-well);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .status-panel {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+    .status-panel b { color: var(--text-main); font-weight: 500; margin-left: 4px; }
+    .hud-credit { gap: 4px; }
+
+    /* Modal Dialogs */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      align-items: center;
+      justify-content: center;
+      z-index: 60;
+    }
+    .modal-card {
+      background: var(--bg-card);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-soft);
+      width: min(440px, calc(100vw - 32px));
+      max-height: calc(100vh - 64px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .modal-body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow-y: auto;
+    }
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 12px 16px;
+      border-top: 1px solid var(--border-color);
+    }
+    .export-preview-text { font-family: var(--font-mono); font-size: 11px; resize: vertical; user-select: text; }
+    .export-preview-png {
+      display: none;
+      text-align: center;
+      background: var(--bg-well);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 8px;
+      max-height: 255px;
+      overflow: auto;
+    }
+    .export-preview-png img { image-rendering: pixelated; max-width: 100%; }
+    /* Thin themed scrollbar; Chromium/Safari get the pill thumb, Firefox the standard properties */
+    .export-preview-png::-webkit-scrollbar, .mini-chips::-webkit-scrollbar { width: 6px; height: 6px; }
+    .export-preview-png::-webkit-scrollbar-track, .mini-chips::-webkit-scrollbar-track { background: transparent; }
+    .export-preview-png::-webkit-scrollbar-thumb, .mini-chips::-webkit-scrollbar-thumb { background: rgba(120,120,128,.4); border-radius: 3px; }
+    .export-preview-png::-webkit-scrollbar-thumb:hover, .mini-chips::-webkit-scrollbar-thumb:hover { background: rgba(120,120,128,.65); }
+    .export-preview-png::-webkit-scrollbar-corner, .mini-chips::-webkit-scrollbar-corner { background: transparent; }
+    @supports not selector(::-webkit-scrollbar) {
+      .export-preview-png, .mini-chips { scrollbar-width: thin; scrollbar-color: rgba(120,120,128,.4) transparent; }
+    }
+    .hotkey-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .hotkey-table th {
+      text-align: left;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: var(--text-muted);
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .hotkey-table td { padding: 6px 8px; border-bottom: 1px solid var(--border-color); }
+    .hotkey-table tr:last-child td { border-bottom: none; }
+    kbd {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 1px 5px;
+    }
+    /* Drag and Drop Overlay */
+    .drop-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.5);
+      z-index: 70;
+      align-items: center;
+      justify-content: center;
+    }
+    .drop-frame {
+      border: 2px dashed var(--accent);
+      border-radius: var(--radius-lg);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 40px 64px;
+      background: rgba(0,0,0,.35);
+    }
+
+    @media (max-width: 1100px) {
+      .inspector {
+        position: absolute;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        width: 300px;
+        z-index: 30;
+        box-shadow: var(--shadow-soft);
+        transform: translateX(100%);
+        transition: transform .2s ease;
+      }
+      .inspector.open { transform: translateX(0); }
+      #btnInspector { display: inline-flex; }
+    }
+    @media (min-width: 1101px) {
+      #btnInspector { display: none; }
+    }
+    @media (max-width: 760px) {
+      .stage-toolbar { flex-wrap: wrap; height: auto; padding: 6px 12px; }
+      #btnSample { display: none; }
+    }
+
+    .about-head { display: flex; align-items: center; gap: 10px; }
+    .about-logo { width: 36px; height: 36px; object-fit: contain; image-rendering: pixelated; }
+    .about-title { font-size: 14px; font-weight: 700; color: var(--text-main); }
+    .about-tagline { font-size: 10px; color: var(--text-muted); }
+    .about-credits { background: var(--bg-well); border: 1px solid var(--border-dark); padding: 8px 10px; font-size: 10px; line-height: 1.6; color: var(--text-main); }
+    .about-credits-label { font-weight: 700; color: var(--accent); margin-bottom: 4px; font-size: 10px; letter-spacing: 0.5px; }
+    .about-link { color: var(--accent); text-decoration: none; }
+    .about-link-strong { font-weight: 600; }
+
+  </style>
+  <script>
+    (function initTheme() {
+      try {
+        const saved = localStorage.getItem('img2palette-theme');
+        if (saved === 'light' || saved === 'dark') {
+          document.documentElement.setAttribute('data-theme', saved);
+        }
+      } catch (e) { /* storage unavailable — keep default */ }
+    })();
+  </script>
+</head>
+<body>
+
+  <!-- Top Header Navigation -->
+  <header>
+    <div class="logo-container">
+      <img src="{{LOGO_B64}}" alt="Img2Palette" class="logo-icon">
+      <span class="logo-title">Img2Palette</span>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn-icon" id="btnOpen" title="Open image (O)" aria-label="Open image">
+        <svg viewBox="0 0 16 16"><path d="M1.5 4.5h4l1.5 2h7.5v6a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-8z"/></svg>
+      </button>
+      <button class="btn-icon" id="btnSample" title="Load sample image" aria-label="Load sample image">
+        <svg viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><circle cx="5.5" cy="6.25" r="1.25"/><path d="M1.5 11.5l4-3.5 3 2.5 2-1.5 4 3.5"/></svg>
+      </button>
+      <input type="file" id="fileInput" accept="image/*" hidden>
+
+      <span class="header-sep"></span>
+
+      <button class="btn-icon" id="btnUndo" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
+        <svg viewBox="0 0 16 16"><path d="M6 4L3 7l3 3"/><path d="M3 7h6a4 4 0 0 1 0 8H7"/></svg>
+      </button>
+      <button class="btn-icon" id="btnRedo" title="Redo (Ctrl+Y)" aria-label="Redo" disabled>
+        <svg viewBox="0 0 16 16"><path d="M10 4l3 3-3 3"/><path d="M13 7H7a4 4 0 0 0 0 8h2"/></svg>
+      </button>
+
+      <span class="header-sep"></span>
+
+      <button class="btn-icon" id="btnInspector" title="Toggle settings" aria-label="Toggle settings">
+        <svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M10 3v10"/></svg>
+      </button>
+
+      <button class="btn" id="btnReset" title="Reset all settings to defaults">Reset</button>
+
+      <div class="menu-wrap">
+        <button class="btn-icon" id="btnMenu" title="More" aria-label="More options" aria-haspopup="true">
+          <svg viewBox="0 0 16 16"><circle cx="3.5" cy="8" r="1.1" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1.1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="8" r="1.1" fill="currentColor" stroke="none"/></svg>
+        </button>
+        <div class="dropdown" id="menuDropdown">
+          <button class="dropdown-item" id="btnTheme">Theme</button>
+          <button class="dropdown-item" id="btnHotkeys">Help</button>
+          <button class="dropdown-item" id="btnAbout">About</button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="btnExportModal">Export</button>
+    </div>
+  </header>
+
+  <!-- Studio Container -->
+  <div class="studio-container">
+
+    <!-- Settings Inspector -->
+    <div class="inspector" id="inspector">
+      <div class="insp-seg segmented" role="tablist">
+        <button class="seg-btn active" data-segment="extract" role="tab">Extract</button>
+        <button class="seg-btn" data-segment="swatches" role="tab">Swatches</button>
+      </div>
+      <div class="inspector-panels">
+
+        <div class="inspector-panel active" data-panel="extract">
+          <div class="form-group">
+            <label class="form-label-row">
+              <span class="form-label">Preset<span class="help-tip" data-tip="One-click palette sizes for common art styles.">?</span></span>
+            </label>
+            <select id="stylePresetSelect">
+              <option value="">None</option>
+              <option value="4">Retro Handheld (4)</option>
+              <option value="8">Vibrant Sprite (8)</option>
+              <option value="16">Studio Standard (16)</option>
+              <option value="24">Poster Art (24)</option>
+              <option value="32">Full Spectrum (32)</option>
+              <option value="64">Extended Range (64)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <div class="form-label-row">
+              <span class="form-label">Colors<span class="help-tip" data-tip="Number of colors extracted (1–256), locked colors included.">?</span></span>
+              <input type="number" class="form-val-input" id="valColorCount" value="9" min="1" max="256" step="1">
+            </div>
+            <input type="range" id="paramColorCount" min="1" max="256" step="1" value="9">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label-row">
+              <span class="form-label">Quantizer<span class="help-tip" data-tip="How pixels are clustered into palette colors.">?</span></span>
+            </label>
+            <select id="quantizerAlgorithmSelect">
+              <option value="wu" selected>Wu</option>
+              <option value="median">Median Cut</option>
+              <option value="kmeans">K-Means++</option>
+              <option value="kmeans_fast">K-Means++ (Fast)</option>
+            </select>
+          </div>
+
+          <div class="form-group" id="balanceGroup">
+            <label class="form-label-row">
+              <span class="form-label">Color Balance<span class="help-tip" data-tip="Balanced weighs coverage and accents; Vibrant favors saturated details; Dominant goes by coverage alone.">?</span></span>
+            </label>
+            <select id="extractionModeSelect">
+              <option value="balanced" selected>Balanced</option>
+              <option value="vibrant">Vibrant</option>
+              <option value="dominant">Dominant</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label-row">
+              <span class="form-label">Sampling<span class="help-tip" data-tip="Resolution the image is analyzed at; higher catches smaller details.">?</span></span>
+            </label>
+            <select id="samplingQualitySelect">
+              <option value="128">Low (128px)</option>
+              <option value="256">Medium (256px)</option>
+              <option value="512" selected>High (512px)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="inspector-panel" data-panel="swatches">
+          <div class="form-group">
+            <label class="form-label-row">
+              <span class="form-label">Sort Order<span class="help-tip" data-tip="How swatches are arranged in the palette. Similarity orders by closeness to the most common color.">?</span></span>
+            </label>
+            <select id="sortModeSelect">
+              <option value="gradient" selected>Smooth Gradient</option>
+              <option value="dominance">Most Common</option>
+              <option value="luminance">Brightness</option>
+              <option value="hue">Hue</option>
+              <option value="ciede2000">Similarity</option>
+            </select>
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="btnReverseSort" title="Reverse the current order">Reverse</button>
+            <button class="btn" id="btnCopyAllHex" title="Copy all hex codes (C)">Copy All</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="btnLockAll" title="Lock every color">Lock All</button>
+            <button class="btn" id="btnUnlockAll" title="Unlock every color and re-extract">Unlock All</button>
+          </div>
+
+          <div class="insp-group-title">Selection</div>
+          <div class="form-hint" id="selectionHint">Click a swatch to select and copy it; Shift+click selects a range. Locked colors survive re-extraction.</div>
+          <div class="swatch-card" id="selectionSingle" hidden>
+            <div class="color-row">
+              <input type="color" id="selColor" title="Edit color (locks it)">
+              <input type="text" id="selHex" spellcheck="false" aria-label="Hex color">
+            </div>
+            <div class="swatch-meta" id="selMeta"></div>
+            <div class="btn-row">
+              <button class="btn" id="btnSelLock">Lock</button>
+              <button class="btn" id="btnSelRemove">Remove</button>
+            </div>
+          </div>
+          <div class="swatch-card" id="selectionMulti" hidden>
+            <div class="swatch-meta" id="selMultiMeta"></div>
+            <div class="mini-chips" id="selMultiChips"></div>
+            <div class="btn-row">
+              <button class="btn" id="btnSelMultiLock">Lock Selected</button>
+              <button class="btn" id="btnSelMultiRemove">Remove</button>
+            </div>
+          </div>
+
+          <div class="insp-group-title" id="lockedTitle" hidden><span>Locked</span><span id="lockedCount">0</span></div>
+          <div class="locked-list" id="lockedList"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Center Stage Studio Viewport -->
+    <div class="stage-container">
+
+      <!-- Stage Viewport Toolbar -->
+      <div class="stage-toolbar">
+        <div class="view-mode-tabs">
+          <button class="tab-btn active" id="tabSideBySide" data-mode="side">Side-by-Side</button>
+          <button class="tab-btn" id="tabResult" data-mode="result">Palette</button>
+        </div>
+
+        <button class="btn btn-tool" id="btnEyedropper" title="Eyedropper (I): click the image to add a color">
+          <svg viewBox="0 0 16 16"><path d="M10.5 2.5l3 3-1.5 1.5-3-3z"/><path d="M9 4l3 3-6.5 6.5H2.5v-3z"/></svg>
+          <span>Eyedropper</span>
+        </button>
+
+        <div class="zoom-controls">
+          <button class="btn" id="btnZoomOut" title="Zoom out">-</button>
+          <span id="zoomLevelText">100%</span>
+          <button class="btn" id="btnZoomIn" title="Zoom in">+</button>
+          <button class="btn" id="btnZoomFit" title="Fit to screen">Fit</button>
+        </div>
+      </div>
+
+      <!-- Viewport Interactive Area -->
+      <div class="viewport-area" id="viewportArea">
+
+        <div class="side-by-side-wrap" id="sideBySideWrap">
+          <div class="side-by-side-card" id="sideImageCard">
+            <canvas id="mainCanvas"></canvas>
+          </div>
+          <div class="side-by-side-card" id="sidePaletteCard">
+            <div class="palette-matrix-grid" id="paletteBoardGrid"></div>
+          </div>
+        </div>
+
+        <!-- Viewport Pixel Grid Overlay (viewport-sized to prevent memory explosion at high zoom) -->
+        <canvas id="gridCanvas" class="pixel-grid-canvas"></canvas>
+
+        <!-- Screen-space chrome, kept out of the zoomed container -->
+        <div class="view-label" id="labelImage">Original</div>
+        <div class="view-label" id="labelPalette">Palette</div>
+      </div>
+
+      <!-- Bottom Status Bar -->
+      <div class="hud-bar">
+        <div class="hud-metrics">
+          <div class="status-panel">Source: <b id="hudDimensions">0 × 0</b></div>
+          <div class="status-panel">Colors: <b id="hudPaletteCount">0</b></div>
+          <div class="status-panel">Render: <b id="hudRenderTime">0 ms</b></div>
+        </div>
+        <div class="hud-credit">Made by <a href="https://github.com/meangrinch" target="_blank" rel="noopener noreferrer" class="about-link about-link-strong">grinnch</a> with ❤️</div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Eyedropper Magnifier -->
+  <div class="eyedropper-loupe" id="eyedropperLoupe">
+    <div class="loupe-preview-box">
+      <canvas id="loupeCanvas" width="90" height="90"></canvas>
+      <div class="loupe-crosshair"></div>
+    </div>
+    <div class="loupe-info">
+      <div class="chip" id="loupeColorSample"></div>
+      <div class="loupe-values">
+        <b id="loupeHex">#FFFFFF</b>
+        <span id="loupeRgb">RGB(255, 255, 255)</span>
+        <span id="loupeCoords">X: 0, Y: 0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export Dialog Modal -->
+  <div class="modal-backdrop" id="exportModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span>Export</span>
+        <button class="btn" data-close="exportModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Format<span class="help-tip" data-tip="PNG swatch image, JSON color list, Aseprite/GIMP palette, CSS variables, or plain hex list.">?</span></label>
+          <select id="exportFormatSelect">
+            <option value="png" selected>PNG</option>
+            <option value="json">JSON</option>
+            <option value="gpl">GPL (Aseprite, GIMP)</option>
+            <option value="css">CSS Variables</option>
+            <option value="hex">Hex List</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="pngExportOptions">
+          <div class="form-group">
+            <label class="form-label">Layout<span class="help-tip" data-tip="Arrangement of the color tiles in the image. Match Preview arranges them like the on-screen palette, including its tile shape.">?</span></label>
+            <select id="pngLayoutSelect">
+              <option value="strip_h" selected>Horizontal</option>
+              <option value="strip_v">Vertical</option>
+              <option value="grid">Grid</option>
+              <option value="preview">Match Preview</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Swatch Size<span class="help-tip" data-tip="Pixel size of each tile; 1px makes a lookup texture.">?</span></label>
+            <select id="pngBlockSizeSelect">
+              <option value="1">1px (Texture)</option>
+              <option value="16">16px</option>
+              <option value="32" selected>32px</option>
+              <option value="64">64px</option>
+            </select>
+          </div>
+          <label class="checkbox-label">
+            <input type="checkbox" id="pngLabelsToggle">
+            <span>Show hex labels</span>
+            <span class="help-tip" data-tip="Prints each hex code under its tile (16px swatches and up).">?</span>
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Filename<span class="help-tip" data-tip="Name used when downloading.">?</span></label>
+          <input type="text" id="exportFilenameInput" value="sample_palette.png" spellcheck="false">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Preview</label>
+          <textarea id="exportPreviewText" class="export-preview-text" rows="6" readonly></textarea>
+          <div class="export-preview-png" id="exportPreviewPngWrap">
+            <img id="exportPreviewPngImg" alt="PNG preview">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" id="btnCopyExport">Copy to Clipboard</button>
+        <button class="btn btn-primary" id="btnDownloadExport">Download</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hotkeys Modal Dialog -->
+  <div class="modal-backdrop" id="hotkeysModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span>Help &amp; Shortcuts</span>
+        <button class="btn" data-close="hotkeysModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <table class="hotkey-table">
+          <thead>
+            <tr>
+              <th>Shortcut</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><kbd>Drag</kbd></td><td>Pan canvas viewport</td></tr>
+            <tr><td><kbd>Middle Drag</kbd></td><td>Pan while the eyedropper is on</td></tr>
+            <tr><td><kbd>Mouse Wheel</kbd></td><td>Zoom in / out</td></tr>
+            <tr><td><kbd>+</kbd> / <kbd>-</kbd></td><td>Zoom in / out</td></tr>
+            <tr><td><kbd>R</kbd></td><td>Fit canvas to screen</td></tr>
+            <tr><td><kbd>1</kbd> / <kbd>3</kbd></td><td>Side-by-Side / Palette view</td></tr>
+            <tr><td><kbd>Space</kbd></td><td>Toggle square grid in Palette view</td></tr>
+            <tr><td><kbd>I</kbd></td><td>Toggle eyedropper</td></tr>
+            <tr><td><kbd>Enter</kbd></td><td>Re-extract palette</td></tr>
+            <tr><td><kbd>C</kbd></td><td>Copy all hex codes</td></tr>
+            <tr><td><kbd>Shift</kbd> + <kbd>Click</kbd></td><td>Select a range of swatches</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>Z</kbd></td><td>Undo last change</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>Y</kbd></td><td>Redo change</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>V</kbd></td><td>Paste image</td></tr>
+            <tr><td><kbd>T</kbd></td><td>Toggle Dark / Light theme</td></tr>
+            <tr><td><kbd>O</kbd></td><td>Open local image file</td></tr>
+            <tr><td><kbd>E</kbd></td><td>Open export dialog</td></tr>
+            <tr><td><kbd>?</kbd></td><td>Open help dialog</td></tr>
+            <tr><td><kbd>Esc</kbd></td><td>Close dialog or eyedropper</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" data-close="hotkeysModal">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- About Modal Dialog -->
+  <div class="modal-backdrop" id="aboutModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span>About Img2Palette</span>
+        <button class="btn" data-close="aboutModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="about-head">
+          <img src="{{LOGO_B64}}" alt="Img2Palette" class="about-logo">
+          <div>
+            <div class="about-title">Img2Palette <span class="version-tag">v{{VERSION}}</span></div>
+            <div class="about-tagline">A browser tool for extracting color palettes from images.</div>
+          </div>
+        </div>
+
+        <div class="about-credits">
+          <div class="about-credits-label">CREDITS &amp; LINKS</div>
+          <div>• <strong>Author:</strong> <a href="https://github.com/meangrinch" target="_blank" rel="noopener noreferrer" class="about-link about-link-strong">grinnch</a></div>
+          <div>• <strong>Support:</strong> <a href="https://ko-fi.com/grinnch" target="_blank" rel="noopener noreferrer" class="about-link">Buy me a coffee on Ko-fi</a></div>
+          <div>• <strong>Source:</strong> <a href="https://github.com/meangrinch/Img2Palette" target="_blank" rel="noopener noreferrer" class="about-link">github.com/meangrinch/Img2Palette</a></div>
+          <div>• <strong>Companions:</strong> <a href="https://github.com/meangrinch/Img2Pixel" target="_blank" rel="noopener noreferrer" class="about-link">Img2Pixel</a>, <a href="https://github.com/meangrinch/PaletteChanger" target="_blank" rel="noopener noreferrer" class="about-link">PaletteChanger</a></div>
+          <div>• <strong>License:</strong> Apache-2.0</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Drag and Drop Overlay -->
+  <div class="drop-overlay" id="dropOverlay">
+    <div class="drop-frame">Drop image to open</div>
+  </div>
+
+  <!-- Floating Help Tooltip -->
+  <div id="floatingTooltip" class="floating-tooltip"></div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!-- Embedded Palette Engine: runs here and, from this same text, in the extraction Web Worker -->
+  <script id="engineSource">
+    /* {{ENGINE_JS}} */
+  </script>
+
+  <!-- Application State & Controller -->
+  <script>
+    const SAMPLE_IMAGE_B64 = "{{SAMPLE_B64}}";
+    window.IMG2PALETTE_VERSION = "{{VERSION}}";
+
+    const DEFAULTS = { colors: 9, quantizer: 'wu', mode: 'balanced', sampling: '512', sort: 'gradient' };
+
+    const state = {
+      image: null,
+      fileName: 'sample',
+      sourceCanvas: document.createElement('canvas'),
+      samplingCanvas: document.createElement('canvas'),
+      swatches: [], // { r, g, b, hex, count, locked }
+      selected: new Set(),
+      anchor: null,
+      viewMode: 'side', // 'side', 'result'
+      gridPeek: false,
+      zoom: 1.0,
+      panX: 0,
+      panY: 0,
+      isPanning: false,
+      panStartX: 0,
+      panStartY: 0,
+      panLastX: 0,
+      panLastY: 0,
+      dragMoved: false,
+      eyedropper: false,
+      requestId: 0
+    };
+    const sourceCtx = state.sourceCanvas.getContext('2d', { willReadFrequently: true });
+    const samplingCtx = state.samplingCanvas.getContext('2d', { willReadFrequently: true });
+
+    const $ = (id) => document.getElementById(id);
+
+    // DOM Elements
+    const mainCanvas = $('mainCanvas');
+    const viewportArea = $('viewportArea');
+    const sideBySideWrap = $('sideBySideWrap');
+    const sideImageCard = $('sideImageCard');
+    const sidePaletteCard = $('sidePaletteCard');
+    const paletteBoardGrid = $('paletteBoardGrid');
+    const gridCanvas = $('gridCanvas');
+    const gridCtx = gridCanvas.getContext('2d');
+    const labelImage = $('labelImage');
+    const labelPalette = $('labelPalette');
+
+    // UI Parameters
+    const stylePresetSelect = $('stylePresetSelect');
+    const paramColorCount = $('paramColorCount');
+    const valColorCount = $('valColorCount');
+    const quantizerAlgorithmSelect = $('quantizerAlgorithmSelect');
+    const extractionModeSelect = $('extractionModeSelect');
+    const samplingQualitySelect = $('samplingQualitySelect');
+    const sortModeSelect = $('sortModeSelect');
+
+    // HUD & Status Elements
+    const hudDimensions = $('hudDimensions');
+    const hudPaletteCount = $('hudPaletteCount');
+    const hudRenderTime = $('hudRenderTime');
+    const zoomLevelText = $('zoomLevelText');
+    const toastEl = $('toast');
+
+    function setStatusMessage(msg, durationMs = 2000) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('visible');
+      clearTimeout(toastEl._timer);
+      if (durationMs > 0) {
+        toastEl._timer = setTimeout(() => toastEl.classList.remove('visible'), durationMs);
+      }
+    }
+
+    async function copyText(text, okMsg) {
+      try {
+        await navigator.clipboard.writeText(text);
+        setStatusMessage(okMsg);
+      } catch (err) {
+        setStatusMessage('Clipboard copy failed: ' + err);
+      }
+    }
+
+    const upperHex = (s) => s.hex.toUpperCase();
+
+    // --- Engine Bridge (Web Worker with synchronous fallback) ---
+
+    let worker = null;
+    const pendingJobs = new Map();
+    let jobCounter = 0;
+
+    try {
+      const src = $('engineSource').textContent;
+      worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+      worker.onmessage = (e) => {
+        const job = pendingJobs.get(e.data.jobId);
+        if (!job) return;
+        pendingJobs.delete(e.data.jobId);
+        if (e.data.error) job.reject(new Error(e.data.error));
+        else job.resolve(e.data.result);
+      };
+      // A worker that can't start (e.g. blocked by the page's origin) errors asynchronously: rerun its jobs here
+      worker.onerror = () => {
+        worker = null;
+        for (const job of pendingJobs.values()) job.runHere();
+        pendingJobs.clear();
+      };
+    } catch (e) {
+      worker = null;
+    }
+
+    function runEngine(method, ...args) {
+      return new Promise((resolve, reject) => {
+        const runHere = () => {
+          try { resolve(PaletteEngine[method](...args)); } catch (err) { reject(err); }
+        };
+        if (!worker) {
+          setTimeout(runHere, 0);
+          return;
+        }
+        const jobId = ++jobCounter;
+        pendingJobs.set(jobId, { resolve, reject, runHere });
+        worker.postMessage({ jobId, method, args });
+      });
+    }
+
+    // --- Image Loading ---
+
+    function loadImageFromSource(src, name) {
+      const img = new Image();
+      img.onload = () => {
+        state.image = img;
+        state.fileName = name;
+        state.sourceCanvas.width = img.naturalWidth;
+        state.sourceCanvas.height = img.naturalHeight;
+        sourceCtx.drawImage(img, 0, 0);
+
+        mainCanvas.width = img.naturalWidth;
+        mainCanvas.height = img.naturalHeight;
+        mainCanvas.getContext('2d').drawImage(img, 0, 0);
+        sizePaletteCard();
+        hudDimensions.textContent = `${img.naturalWidth} × ${img.naturalHeight}`;
+
+        // History and any running extraction belong to the previous image (locked colors carry over)
+        historyStack.length = 0;
+        historyIndex = -1;
+        updateUndoRedoUI();
+        clearSelection();
+        supersedePending();
+        zoomFit();
+        extract();
+      };
+      img.onerror = () => setStatusMessage("Couldn't open that file as an image.", 3000);
+      img.src = src;
+    }
+
+    function loadFile(file, name) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => loadImageFromSource(evt.target.result, name || file.name.replace(/\.[^/.]+$/, '') || 'image');
+      reader.readAsDataURL(file);
+    }
+
+    // Image pixels downscaled to the sampling resolution, as RGBA bytes
+    function getSamplingPixels() {
+      const maxDim = parseInt(samplingQualitySelect.value, 10) || 256;
+      const w = state.sourceCanvas.width;
+      const h = state.sourceCanvas.height;
+      const scale = Math.min(1, maxDim / Math.max(w, h));
+      const sw = Math.max(1, Math.round(w * scale));
+      const sh = Math.max(1, Math.round(h * scale));
+      state.samplingCanvas.width = sw;
+      state.samplingCanvas.height = sh;
+      // Resizing resets context state. 'low' (bilinear) skips source pixels on large downscales, dropping small accents.
+      samplingCtx.imageSmoothingQuality = 'high';
+      samplingCtx.drawImage(state.sourceCanvas, 0, 0, sw, sh);
+      return samplingCtx.getImageData(0, 0, sw, sh).data;
+    }
+
+    function getPixelAt(x, y) {
+      const d = sourceCtx.getImageData(x, y, 1, 1).data;
+      return { r: d[0], g: d[1], b: d[2], hex: PaletteEngine.rgbToHex(d[0], d[1], d[2]) };
+    }
+
+    // --- Extraction & Sorting ---
+
+    const toSwatch = (c) => ({
+      r: c.r, g: c.g, b: c.b,
+      hex: PaletteEngine.rgbToHex(c.r, c.g, c.b),
+      count: c.count || 1,
+      locked: !!c.locked
+    });
+
+    // One extraction in flight; requests made meanwhile collapse into a single rerun, so slider drags
+    // never queue a backlog of stale jobs in the worker
+    let extracting = false;
+    let extractQueued = false;
+
+    async function extract() {
+      if (!state.image) return;
+      if (extracting) {
+        extractQueued = true;
+        return;
+      }
+      extracting = true;
+      const requestId = ++state.requestId;
+      const started = performance.now();
+      try {
+        const palette = await runEngine('extractPalette', getSamplingPixels(), parseInt(paramColorCount.value, 10), {
+          lockedColors: state.swatches.filter((s) => s.locked).map(({ r, g, b }) => ({ r, g, b })),
+          sortMode: sortModeSelect.value,
+          mode: extractionModeSelect.value,
+          quantizer: quantizerAlgorithmSelect.value
+        });
+        // A sort, undo or edit made while this ran wins over the stale extraction
+        if (requestId === state.requestId) {
+          state.swatches = palette.map(toSwatch);
+          clearSelection();
+          hudRenderTime.textContent = `${Math.round(performance.now() - started)} ms`;
+          pushHistory();
+          renderPalette();
+        }
+      } catch (err) {
+        setStatusMessage(`Extraction failed: ${err.message || err}`, 3000);
+      } finally {
+        extracting = false;
+        if (extractQueued) {
+          extractQueued = false;
+          extract();
+        }
+      }
+    }
+
+    let extractTimer = null;
+    function scheduleExtract() {
+      clearTimeout(extractTimer);
+      extractTimer = setTimeout(extract, 20);
+    }
+
+    async function sortOnly() {
+      // The running extraction sorts by the current mode; queue behind it rather than discard its new settings
+      if (extracting) {
+        extract();
+        return;
+      }
+      if (state.swatches.length <= 1) return;
+      const requestId = ++state.requestId;
+      const selectedHexes = new Set([...state.selected].map((i) => state.swatches[i].hex));
+      try {
+        const sorted = await runEngine('sortPalette', state.swatches, sortModeSelect.value);
+        if (requestId !== state.requestId) return;
+        state.swatches = sorted.map(toSwatch);
+        state.selected = new Set(state.swatches.map((s, i) => (selectedHexes.has(s.hex) ? i : -1)).filter((i) => i >= 0));
+        state.anchor = state.selected.size ? [...state.selected][0] : null;
+        pushHistory();
+        renderPalette();
+      } catch (err) {
+        setStatusMessage(`Sort failed: ${err.message || err}`, 3000);
+      }
+    }
+
+    // --- Swatch Operations ---
+
+    function clearSelection() {
+      state.selected.clear();
+      state.anchor = null;
+    }
+
+    // A swatch edit made while an extraction runs discards that result but queues a rerun, so settings changed
+    // just before still apply; the rerun keeps the edit when it locked a color. Undo cancels the rerun instead.
+    function supersedePending() {
+      state.requestId++;
+      if (extracting) extractQueued = true;
+    }
+
+    function toggleSelect(idx, shift) {
+      if (shift && state.anchor !== null) {
+        state.selected.clear();
+        for (let i = Math.min(state.anchor, idx); i <= Math.max(state.anchor, idx); i++) state.selected.add(i);
+      } else if (state.selected.size === 1 && state.selected.has(idx)) {
+        clearSelection();
+      } else {
+        state.selected = new Set([idx]);
+        state.anchor = idx;
+      }
+    }
+
+    // Unlocking can free slots, so it re-extracts; locking only marks
+    function setLocked(indices, locked) {
+      indices.forEach((i) => { state.swatches[i].locked = locked; });
+      supersedePending();
+      pushHistory();
+      if (!locked && state.image) extract();
+      else renderPalette();
+    }
+
+    function removeSwatches(indices) {
+      const drop = new Set(indices);
+      state.swatches = state.swatches.filter((_, i) => !drop.has(i));
+      clearSelection();
+      supersedePending();
+      pushHistory();
+      renderPalette();
+    }
+
+    function setSwatchColor(idx, hex, record) {
+      const rgb = PaletteEngine.hexToRgb(hex);
+      if (!rgb) {
+        setStatusMessage(`"${hex}" isn't a hex color.`);
+        renderSelection();
+        return;
+      }
+      Object.assign(state.swatches[idx], rgb, { hex: PaletteEngine.rgbToHex(rgb.r, rgb.g, rgb.b), locked: true });
+      supersedePending();
+      if (record) pushHistory();
+      renderPalette();
+    }
+
+    function addSwatch(rgb) {
+      state.swatches.push({ r: rgb.r, g: rgb.g, b: rgb.b, hex: PaletteEngine.rgbToHex(rgb.r, rgb.g, rgb.b), count: 1, locked: true });
+      supersedePending();
+      pushHistory();
+      renderPalette();
+    }
+
+    function reverseSwatches() {
+      const n = state.swatches.length;
+      state.swatches.reverse();
+      state.selected = new Set([...state.selected].map((i) => n - 1 - i));
+      if (state.anchor !== null) state.anchor = n - 1 - state.anchor;
+      supersedePending();
+      pushHistory();
+      renderPalette();
+    }
+
+    function copyAllHex() {
+      if (!state.swatches.length) return;
+      copyText(PaletteEngine.formatHexPalette(state.swatches), `Copied ${state.swatches.length} hex codes`);
+    }
+
+    // --- History (Undo / Redo) ---
+
+    const btnUndo = $('btnUndo');
+    const btnRedo = $('btnRedo');
+    const historyStack = [];
+    let historyIndex = -1;
+
+    function updateUndoRedoUI() {
+      btnUndo.disabled = historyIndex <= 0;
+      btnRedo.disabled = historyIndex >= historyStack.length - 1;
+    }
+
+    function pushHistory() {
+      const snap = JSON.stringify(state.swatches);
+      if (historyIndex >= 0 && historyStack[historyIndex] === snap) return;
+      historyStack.splice(historyIndex + 1);
+      historyStack.push(snap);
+      if (historyStack.length > 50) historyStack.shift();
+      historyIndex = historyStack.length - 1;
+      updateUndoRedoUI();
+    }
+
+    function restoreHistory(step) {
+      const next = historyIndex + step;
+      if (next < 0 || next >= historyStack.length) return;
+      historyIndex = next;
+      state.swatches = JSON.parse(historyStack[historyIndex]);
+      clearSelection();
+      supersedePending();
+      extractQueued = false;
+      updateUndoRedoUI();
+      renderPalette();
+    }
+
+    btnUndo.onclick = () => restoreHistory(-1);
+    btnRedo.onclick = () => restoreHistory(1);
+
+    // --- Palette Rendering ---
+
+    // Columns that fill the card with near-square cells for common palette sizes
+    function gridColumns(k) {
+      if (k <= 2) return Math.max(1, k);
+      if (k <= 4) return 2;
+      if (k <= 6) return 3;
+      if (k <= 8) return 4;
+      if (k <= 9) return 3;
+      if (k <= 20) return k <= 16 ? 4 : 5;
+      if (k <= 25) return 5;
+      if (k <= 32) return 8;
+      if (k <= 36) return 6;
+      if (k <= 49) return 7;
+      return Math.ceil(Math.sqrt(k));
+    }
+
+    // The palette card mirrors the image size so both sides share one zoom. Grid peek (Space in palette
+    // view) gives it square cells instead, which reads better for non-square images.
+    function sizePaletteCard() {
+      let w = state.sourceCanvas.width;
+      let h = state.sourceCanvas.height;
+      if (state.gridPeek) {
+        const k = state.swatches.length;
+        const cols = gridColumns(k);
+        const rows = Math.max(1, Math.ceil(k / cols));
+        const cell = Math.max(w, h) / Math.max(cols, rows);
+        w = cols * cell;
+        h = rows * cell;
+      }
+      sidePaletteCard.style.width = `${w}px`;
+      sidePaletteCard.style.height = `${h}px`;
+    }
+
+    function toggleGridPeek() {
+      if (state.viewMode !== 'result' || !state.image) return;
+      state.gridPeek = !state.gridPeek;
+      sizePaletteCard();
+      zoomFit();
+    }
+
+    function renderPalette() {
+      const k = state.swatches.length;
+      const total = state.swatches.reduce((sum, s) => sum + (s.count || 1), 0);
+      const cols = gridColumns(k);
+      paletteBoardGrid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+      paletteBoardGrid.style.gridTemplateRows = `repeat(${Math.max(1, Math.ceil(k / cols))}, 1fr)`;
+      paletteBoardGrid.replaceChildren(...state.swatches.map((s, idx) => {
+        const el = document.createElement('div');
+        el.className = 'palette-square-swatch';
+        el.classList.toggle('active', state.selected.has(idx));
+        el.classList.toggle('locked', s.locked);
+        el.style.backgroundColor = s.hex;
+        el.dataset.idx = String(idx);
+        el.title = `${upperHex(s)} · RGB(${s.r}, ${s.g}, ${s.b}) · ${(s.count / total * 100).toFixed(1)}%${s.locked ? ' · locked' : ''}`;
+        return el;
+      }));
+
+      if (state.gridPeek) sizePaletteCard();
+      hudPaletteCount.textContent = String(k);
+      renderSelection();
+      renderLockedList();
+      if ($('exportModal').style.display === 'flex') updateExportPreview();
+    }
+
+    function renderSelection() {
+      const idxs = [...state.selected].filter((i) => i < state.swatches.length).sort((a, b) => a - b);
+      $('selectionHint').hidden = idxs.length > 0;
+      $('selectionSingle').hidden = idxs.length !== 1;
+      $('selectionMulti').hidden = idxs.length < 2;
+      if (idxs.length === 1) {
+        const s = state.swatches[idxs[0]];
+        const total = state.swatches.reduce((sum, c) => sum + (c.count || 1), 0);
+        const selColor = $('selColor');
+        if (selColor.value !== s.hex) selColor.value = s.hex;
+        if (document.activeElement !== $('selHex')) $('selHex').value = upperHex(s);
+        $('selMeta').textContent = `RGB(${s.r}, ${s.g}, ${s.b}) · ${(s.count / total * 100).toFixed(1)}% of image`;
+        $('btnSelLock').textContent = s.locked ? 'Unlock' : 'Lock';
+      } else if (idxs.length > 1) {
+        const anyUnlocked = idxs.some((i) => !state.swatches[i].locked);
+        $('selMultiMeta').textContent = `${idxs.length} selected`;
+        $('btnSelMultiLock').textContent = anyUnlocked ? 'Lock Selected' : 'Unlock Selected';
+        $('selMultiChips').replaceChildren(...idxs.map((i) => {
+          const chip = document.createElement('div');
+          chip.className = 'chip';
+          chip.style.backgroundColor = state.swatches[i].hex;
+          chip.title = upperHex(state.swatches[i]);
+          return chip;
+        }));
+      }
+    }
+
+    function renderLockedList() {
+      const locked = state.swatches.map((s, idx) => ({ s, idx })).filter(({ s }) => s.locked);
+      $('lockedTitle').hidden = locked.length === 0;
+      $('lockedCount').textContent = String(locked.length);
+      $('lockedList').replaceChildren(...locked.map(({ s, idx }) => {
+        const item = document.createElement('div');
+        item.className = 'locked-item';
+        item.title = `Select ${upperHex(s)}`;
+        const chip = document.createElement('div');
+        chip.className = 'chip';
+        chip.style.backgroundColor = s.hex;
+        const label = document.createElement('span');
+        label.textContent = upperHex(s);
+        const unlock = document.createElement('button');
+        unlock.className = 'btn';
+        unlock.textContent = 'Unlock';
+        unlock.onclick = (e) => {
+          e.stopPropagation();
+          setLocked([idx], false);
+        };
+        item.onclick = (e) => {
+          toggleSelect(idx, e.shiftKey);
+          renderPalette();
+        };
+        item.append(chip, label, unlock);
+        return item;
+      }));
+    }
+
+    paletteBoardGrid.addEventListener('click', (e) => {
+      const el = e.target.closest('.palette-square-swatch');
+      if (!el || state.dragMoved) return;
+      toggleSelect(parseInt(el.dataset.idx, 10), e.shiftKey);
+      renderPalette();
+      const idxs = [...state.selected].sort((a, b) => a - b);
+      if (idxs.length === 1) copyText(upperHex(state.swatches[idxs[0]]), `Copied ${upperHex(state.swatches[idxs[0]])}`);
+      else if (idxs.length > 1) copyText(idxs.map((i) => upperHex(state.swatches[i])).join(', '), `Copied ${idxs.length} hex codes`);
+    });
+
+    // --- Interactive Viewport & Pan / Zoom ---
+
+    function updateTransform() {
+      zoomLevelText.textContent = `${Math.round(state.zoom * 100)}%`;
+      sideBySideWrap.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
+      sideBySideWrap.style.setProperty('--zoom', state.zoom);
+      renderPixelGrid();
+      updateOverlays();
+    }
+
+    // Title labels are placed in viewport pixels from the card rects. Counter-scaling them inside the
+    // zoomed container broke at high zoom: sub-pixel sizes get snapped when painted.
+    function updateOverlays() {
+      const vpRect = viewportArea.getBoundingClientRect();
+      [[labelImage, sideImageCard], [labelPalette, sidePaletteCard]].forEach(([label, card]) => {
+        const r = card.getBoundingClientRect();
+        const left = Math.max(r.left, vpRect.left);
+        const right = Math.min(r.right, vpRect.right);
+        const visible = state.viewMode === 'side' && state.image
+          && right > left && r.bottom > vpRect.top && r.top < vpRect.bottom;
+        label.style.display = visible ? 'block' : 'none';
+        if (!visible) return;
+        // Sits on top of the card, sticking to the viewport top once zoomed past it
+        const top = Math.max(vpRect.top, r.top - label.offsetHeight);
+        label.style.left = `${left - vpRect.left}px`;
+        label.style.width = `${right - left}px`;
+        label.style.top = `${top - vpRect.top}px`;
+      });
+    }
+
+    function zoomAt(zoomFactor, clientX, clientY) {
+      const newZoom = Math.max(0.05, Math.min(32.0, state.zoom * zoomFactor));
+      if (newZoom === state.zoom) return;
+      const rect = viewportArea.getBoundingClientRect();
+      const mouseX = clientX - rect.left - rect.width / 2;
+      const mouseY = clientY - rect.top - rect.height / 2;
+      const effectiveFactor = newZoom / state.zoom;
+      state.panX -= (mouseX - state.panX) * (effectiveFactor - 1);
+      state.panY -= (mouseY - state.panY) * (effectiveFactor - 1);
+      state.zoom = newZoom;
+      updateTransform();
+    }
+
+    function zoomIn() {
+      state.zoom = Math.min(32.0, state.zoom * 1.25);
+      updateTransform();
+    }
+
+    function zoomOut() {
+      state.zoom = Math.max(0.05, state.zoom * 0.8);
+      updateTransform();
+    }
+
+    function zoomFit() {
+      if (!state.image) return;
+      const vpW = Math.max(0, viewportArea.clientWidth - 32);
+      const vpH = Math.max(0, viewportArea.clientHeight - 32);
+      if (vpW <= 0 || vpH <= 0) {
+        requestAnimationFrame(zoomFit);
+        return;
+      }
+      const w = sidePaletteCard.offsetWidth;
+      const h = sidePaletteCard.offsetHeight;
+      // Side-by-side: two equal cards with a 16px gap; title labels sit above them in screen space, so reserve
+      // room for them. Palette view: the palette card alone, unlabeled.
+      const fitScale = state.viewMode === 'side'
+        ? Math.min(vpW / (w * 2 + 16), Math.max(1, vpH - 26) / h)
+        : Math.min(vpW / w, vpH / h);
+      // Floor to integer percentage so zoom never exceeds viewport bounds
+      state.zoom = Math.max(0.05, Math.min(32.0, Math.floor(fitScale * 100) / 100));
+      state.panX = 0;
+      state.panY = 0;
+      updateTransform();
+    }
+
+    function renderPixelGrid() {
+      const vpRect = viewportArea.getBoundingClientRect();
+      const rect = mainCanvas.getBoundingClientRect();
+      const cellPx = state.image && state.viewMode === 'side' ? rect.width / mainCanvas.width : 0;
+      // Grid appears once each image pixel spans 24+ screen pixels
+      if (cellPx < 24 || vpRect.width <= 0 || vpRect.height <= 0) {
+        gridCanvas.style.display = 'none';
+        return;
+      }
+
+      // Backing store in device pixels so lines are 1 device pixel wide and land on cell edges
+      const dpr = window.devicePixelRatio || 1;
+      const devW = Math.round(vpRect.width * dpr);
+      const devH = Math.round(vpRect.height * dpr);
+      if (gridCanvas.width !== devW || gridCanvas.height !== devH) {
+        gridCanvas.width = devW;
+        gridCanvas.height = devH;
+      }
+      gridCanvas.style.display = 'block';
+      gridCtx.clearRect(0, 0, devW, devH);
+
+      const originX = (rect.left - vpRect.left) * dpr;
+      const originY = (rect.top - vpRect.top) * dpr;
+      const stepX = rect.width * dpr / mainCanvas.width;
+      const stepY = rect.height * dpr / mainCanvas.height;
+      const boxLeft = Math.max(0, originX);
+      const boxRight = Math.min(devW, originX + rect.width * dpr);
+      const boxTop = Math.max(0, originY);
+      const boxBottom = Math.min(devH, originY + rect.height * dpr);
+      if (boxLeft >= boxRight || boxTop >= boxBottom) return;
+
+      const startCol = Math.max(0, Math.floor((boxLeft - originX) / stepX));
+      const endCol = Math.min(mainCanvas.width, Math.ceil((boxRight - originX) / stepX));
+      const startRow = Math.max(0, Math.floor((boxTop - originY) / stepY));
+      const endRow = Math.min(mainCanvas.height, Math.ceil((boxBottom - originY) / stepY));
+
+      gridCtx.beginPath();
+      for (let col = startCol; col <= endCol; col++) {
+        const x = Math.round(originX + col * stepX) + 0.5;
+        gridCtx.moveTo(x, boxTop);
+        gridCtx.lineTo(x, boxBottom);
+      }
+      for (let row = startRow; row <= endRow; row++) {
+        const y = Math.round(originY + row * stepY) + 0.5;
+        gridCtx.moveTo(boxLeft, y);
+        gridCtx.lineTo(boxRight, y);
+      }
+      gridCtx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
+      gridCtx.lineWidth = 1;
+      gridCtx.stroke();
+    }
+
+    // Image pixel under the pointer, or null off the image
+    function imageCoordsAt(e) {
+      if (!state.image) return null;
+      const rect = mainCanvas.getBoundingClientRect();
+      if (e.clientX < rect.left || e.clientX >= rect.right || e.clientY < rect.top || e.clientY >= rect.bottom) return null;
+      return {
+        x: Math.min(mainCanvas.width - 1, Math.floor((e.clientX - rect.left) * mainCanvas.width / rect.width)),
+        y: Math.min(mainCanvas.height - 1, Math.floor((e.clientY - rect.top) * mainCanvas.height / rect.height))
+      };
+    }
+
+    viewportArea.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      zoomAt(e.deltaY < 0 ? 1.2 : 0.833, e.clientX, e.clientY);
+    }, { passive: false });
+
+    viewportArea.addEventListener('mousedown', (e) => {
+      if (e.button !== 0 && e.button !== 1) return;
+      state.dragMoved = false;
+      if (e.button === 0 && state.eyedropper) {
+        const coords = imageCoordsAt(e);
+        if (coords) {
+          const px = getPixelAt(coords.x, coords.y);
+          addSwatch(px);
+          setStatusMessage(`Added ${px.hex.toUpperCase()} to the palette`);
+          return;
+        }
+      }
+      e.preventDefault();
+      state.isPanning = true;
+      state.panLastX = state.panStartX = e.clientX;
+      state.panLastY = state.panStartY = e.clientY;
+      viewportArea.classList.add('panning');
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (state.isPanning) {
+        // Apply movement deltas so zooming (which also moves pan) mid-drag doesn't snap back
+        state.panX += e.clientX - state.panLastX;
+        state.panY += e.clientY - state.panLastY;
+        // Past a few pixels it's a drag, and the click that ends it must not toggle a swatch
+        if (Math.hypot(e.clientX - state.panStartX, e.clientY - state.panStartY) > 4) state.dragMoved = true;
+        state.panLastX = e.clientX;
+        state.panLastY = e.clientY;
+        updateTransform();
+      }
+      if (state.eyedropper) updateLoupe(e);
+    });
+
+    window.addEventListener('mouseup', () => {
+      state.isPanning = false;
+      viewportArea.classList.remove('panning');
+    });
+
+    window.addEventListener('resize', () => {
+      if (state.image) zoomFit();
+    });
+
+    $('btnZoomIn').onclick = zoomIn;
+    $('btnZoomOut').onclick = zoomOut;
+    $('btnZoomFit').onclick = zoomFit;
+
+    // Expose viewport controller on window for inspection & test automation
+    window.ViewportController = { zoomIn, zoomOut, zoomAt, zoomFit, renderPixelGrid, updateTransform, getState: () => state };
+
+    // --- Eyedropper ---
+
+    const btnEyedropper = $('btnEyedropper');
+    const loupe = $('eyedropperLoupe');
+    const loupeCtx = $('loupeCanvas').getContext('2d');
+
+    function setEyedropper(on) {
+      state.eyedropper = on;
+      btnEyedropper.classList.toggle('active', on);
+      viewportArea.classList.toggle('eyedropper-active', on);
+      if (!on) loupe.style.display = 'none';
+    }
+
+    function updateLoupe(e) {
+      const coords = imageCoordsAt(e);
+      if (!coords) {
+        loupe.style.display = 'none';
+        return;
+      }
+      const px = getPixelAt(coords.x, coords.y);
+      loupe.style.display = 'flex';
+      let lx = e.clientX + 16;
+      let ly = e.clientY + 16;
+      if (lx + 165 > window.innerWidth) lx = e.clientX - 168;
+      if (ly + 175 > window.innerHeight) ly = e.clientY - 175;
+      loupe.style.left = `${Math.max(10, lx)}px`;
+      loupe.style.top = `${Math.max(10, ly)}px`;
+      $('loupeHex').textContent = px.hex.toUpperCase();
+      $('loupeRgb').textContent = `RGB(${px.r}, ${px.g}, ${px.b})`;
+      $('loupeCoords').textContent = `X: ${coords.x}, Y: ${coords.y}`;
+      $('loupeColorSample').style.backgroundColor = px.hex;
+
+      // 7x7 pixel neighborhood magnified
+      loupeCtx.imageSmoothingEnabled = false;
+      loupeCtx.clearRect(0, 0, 90, 90);
+      loupeCtx.drawImage(state.sourceCanvas, coords.x - 3, coords.y - 3, 7, 7, 0, 0, 90, 90);
+    }
+
+    btnEyedropper.onclick = () => setEyedropper(!state.eyedropper);
+
+    // --- View Modes ---
+
+    // Palette view hides the image, so the eyedropper has nothing to sample there
+    function setViewMode(mode) {
+      state.viewMode = mode;
+      document.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
+      sideImageCard.style.display = mode === 'side' ? '' : 'none';
+      btnEyedropper.disabled = mode !== 'side';
+      if (mode !== 'side') setEyedropper(false);
+      if (mode !== 'result' && state.gridPeek) {
+        state.gridPeek = false;
+        sizePaletteCard();
+      }
+      zoomFit();
+      updateTransform();
+    }
+
+    document.querySelectorAll('.tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => setViewMode(btn.dataset.mode));
+    });
+
+    // --- Settings ---
+
+    function updateLabels() {
+      valColorCount.value = paramColorCount.value;
+      // Wu and Median Cut don't weight colors, so balance only applies to the K-Means quantizers
+      $('balanceGroup').style.display = quantizerAlgorithmSelect.value.startsWith('kmeans') ? 'flex' : 'none';
+    }
+
+    paramColorCount.addEventListener('input', () => {
+      updateLabels();
+      scheduleExtract();
+    });
+    valColorCount.addEventListener('change', () => {
+      const n = parseInt(valColorCount.value, 10);
+      if (!Number.isNaN(n)) paramColorCount.value = Math.min(256, Math.max(1, n));
+      updateLabels();
+      scheduleExtract();
+    });
+    [quantizerAlgorithmSelect, extractionModeSelect, samplingQualitySelect].forEach((el) => {
+      el.addEventListener('change', () => {
+        updateLabels();
+        scheduleExtract();
+      });
+    });
+    sortModeSelect.addEventListener('change', () => {
+      if (state.swatches.length) sortOnly();
+      else extract();
+    });
+
+    function applyDefaults() {
+      paramColorCount.value = DEFAULTS.colors;
+      quantizerAlgorithmSelect.value = DEFAULTS.quantizer;
+      extractionModeSelect.value = DEFAULTS.mode;
+      samplingQualitySelect.value = DEFAULTS.sampling;
+      sortModeSelect.value = DEFAULTS.sort;
+      updateLabels();
+    }
+
+    // Presets only choose a color count, so "None" restores just the default count
+    stylePresetSelect.addEventListener('change', () => {
+      paramColorCount.value = stylePresetSelect.value || DEFAULTS.colors;
+      updateLabels();
+      extract();
+    });
+
+    // Reset Defaults: settings, locks, palette and view
+    $('btnReset').onclick = () => {
+      stylePresetSelect.value = '';
+      applyDefaults();
+      state.swatches = [];
+      clearSelection();
+      supersedePending();
+      zoomFit();
+      extract();
+    };
+
+    // Inspector segment switching
+    const segButtons = document.querySelectorAll('.insp-seg .seg-btn');
+    const inspectorPanels = document.querySelectorAll('.inspector-panel');
+    segButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        segButtons.forEach((b) => b.classList.toggle('active', b === btn));
+        inspectorPanels.forEach((p) => p.classList.toggle('active', p.dataset.panel === btn.dataset.segment));
+      });
+    });
+
+    $('btnReverseSort').onclick = reverseSwatches;
+    $('btnCopyAllHex').onclick = copyAllHex;
+    $('btnLockAll').onclick = () => setLocked(state.swatches.map((_, i) => i), true);
+    $('btnUnlockAll').onclick = () => setLocked(state.swatches.map((_, i) => i), false);
+
+    const selectedIndices = () => [...state.selected].filter((i) => i < state.swatches.length);
+    $('btnSelLock').onclick = () => {
+      const [i] = selectedIndices();
+      setLocked([i], !state.swatches[i].locked);
+    };
+    $('btnSelMultiLock').onclick = () => {
+      const idxs = selectedIndices();
+      setLocked(idxs, idxs.some((i) => !state.swatches[i].locked));
+    };
+    $('btnSelRemove').onclick = () => removeSwatches(selectedIndices());
+    $('btnSelMultiRemove').onclick = () => removeSwatches(selectedIndices());
+    $('selColor').addEventListener('input', (e) => setSwatchColor(selectedIndices()[0], e.target.value, false));
+    $('selColor').addEventListener('change', () => pushHistory());
+    $('selHex').addEventListener('change', (e) => setSwatchColor(selectedIndices()[0], e.target.value, true));
+
+    // --- File Open, Sample, Drag & Drop, Paste ---
+
+    $('btnOpen').onclick = () => $('fileInput').click();
+    $('fileInput').onchange = (e) => {
+      loadFile(e.target.files && e.target.files[0]);
+      // Clear so picking the same file again still fires change
+      e.target.value = '';
+    };
+    $('btnSample').onclick = () => loadImageFromSource(SAMPLE_IMAGE_B64, 'sample');
+
+    const dropOverlay = $('dropOverlay');
+    window.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (e.dataTransfer.types.includes('Files')) dropOverlay.style.display = 'flex';
+    });
+    // relatedTarget is null only when the drag leaves the page (any edge) or is cancelled
+    window.addEventListener('dragleave', (e) => {
+      if (!e.relatedTarget) dropOverlay.style.display = 'none';
+    });
+    window.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropOverlay.style.display = 'none';
+      loadFile(e.dataTransfer.files && e.dataTransfer.files[0]);
+    });
+
+    window.addEventListener('paste', (e) => {
+      if (e.target.matches && e.target.matches('input, textarea')) return;
+      const item = [...(e.clipboardData ? e.clipboardData.items : [])].find((it) => it.type.startsWith('image/'));
+      if (item) {
+        e.preventDefault();
+        loadFile(item.getAsFile(), 'pasted_image');
+      }
+    });
+
+    // Theme Toggle
+    $('btnTheme').onclick = () => {
+      const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('img2palette-theme', next); } catch (e) { /* ignore */ }
+      setStatusMessage(`Theme: ${next === 'light' ? 'Light' : 'Dark'}`);
+    };
+
+    // --- Export Modal Controller ---
+
+    const exportFormatSelect = $('exportFormatSelect');
+    const exportFilenameInput = $('exportFilenameInput');
+    const EXPORT_EXT = { png: 'png', json: 'json', gpl: 'gpl', css: 'css', hex: 'txt' };
+    const EXPORT_MIME = { json: 'application/json', gpl: 'text/plain', css: 'text/css', hex: 'text/plain' };
+
+    function pngOptions() {
+      return {
+        layout: $('pngLayoutSelect').value,
+        blockSize: parseInt($('pngBlockSizeSelect').value, 10),
+        showLabels: $('pngLabelsToggle').checked
+      };
+    }
+
+    function renderPngPalette(swatches, { layout, blockSize, showLabels }) {
+      const labels = showLabels && blockSize >= 16;
+      const n = Math.max(1, swatches.length);
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      let tileW = blockSize;
+      let tileH = blockSize;
+      let place;
+      if (layout === 'strip_v') {
+        canvas.width = blockSize + (labels ? 64 : 0);
+        canvas.height = n * blockSize;
+        place = (i) => ({ x: 0, y: i * blockSize, lx: blockSize + 6, ly: i * blockSize + blockSize / 2, align: 'left' });
+      } else {
+        const cols = layout === 'grid' ? Math.ceil(Math.sqrt(n)) : layout === 'preview' ? gridColumns(n) : n;
+        if (layout === 'preview') {
+          // Tile shape of the on-screen mosaic, which splits the source image's area into cols x rows;
+          // the shorter side is the swatch size
+          const rows = Math.ceil(n / cols);
+          const aspect = (state.sourceCanvas.width / cols) / (state.sourceCanvas.height / rows);
+          if (aspect >= 1) tileW = Math.round(blockSize * aspect);
+          else tileH = Math.round(blockSize / aspect);
+        }
+        const cellH = tileH + (labels ? 14 : 0);
+        canvas.width = cols * tileW;
+        canvas.height = Math.ceil(n / cols) * cellH;
+        place = (i) => {
+          const x = (i % cols) * tileW;
+          const y = Math.floor(i / cols) * cellH;
+          return { x, y, lx: x + tileW / 2, ly: y + tileH + 7, align: 'center' };
+        };
+      }
+      ctx.fillStyle = '#1c1a26';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.font = '9px monospace';
+      ctx.textBaseline = 'middle';
+      swatches.forEach((s, i) => {
+        const p = place(i);
+        ctx.fillStyle = s.hex;
+        ctx.fillRect(p.x, p.y, tileW, tileH);
+        if (labels) {
+          ctx.fillStyle = '#f5f2eb';
+          ctx.textAlign = p.align;
+          ctx.fillText(upperHex(s), p.lx, p.ly);
+        }
+      });
+      return canvas;
+    }
+
+    function exportText(format) {
+      const name = `${state.fileName} Palette`;
+      if (format === 'json') return PaletteEngine.formatJsonPalette(state.swatches, name);
+      if (format === 'gpl') return PaletteEngine.formatGplPalette(state.swatches, name);
+      if (format === 'css') return PaletteEngine.formatCssPalette(state.swatches);
+      return PaletteEngine.formatHexPalette(state.swatches);
+    }
+
+    function updateExportPreview() {
+      const isPng = exportFormatSelect.value === 'png';
+      $('pngExportOptions').style.display = isPng ? 'flex' : 'none';
+      $('exportPreviewText').style.display = isPng ? 'none' : 'block';
+      $('exportPreviewPngWrap').style.display = isPng ? 'block' : 'none';
+      if (isPng) $('exportPreviewPngImg').src = renderPngPalette(state.swatches, pngOptions()).toDataURL('image/png');
+      else $('exportPreviewText').value = exportText(exportFormatSelect.value);
+    }
+
+    // Only a known export extension is swapped, so dots inside the image's own name survive
+    const EXPORT_EXT_RE = new RegExp(`\\.(${Object.values(EXPORT_EXT).join('|')})$`, 'i');
+    function setExportExtension() {
+      const base = exportFilenameInput.value.trim().replace(EXPORT_EXT_RE, '') || `${state.fileName}_palette`;
+      exportFilenameInput.value = `${base}.${EXPORT_EXT[exportFormatSelect.value]}`;
+    }
+
+    function openModal(id) {
+      $(id).style.display = 'flex';
+    }
+
+    function closeModal(id) {
+      $(id).style.display = 'none';
+    }
+
+    $('btnExportModal').onclick = () => {
+      exportFilenameInput.value = `${state.fileName}_palette.${EXPORT_EXT[exportFormatSelect.value]}`;
+      updateExportPreview();
+      openModal('exportModal');
+    };
+    exportFormatSelect.addEventListener('change', () => {
+      setExportExtension();
+      updateExportPreview();
+    });
+    ['pngLayoutSelect', 'pngBlockSizeSelect', 'pngLabelsToggle'].forEach((id) => $(id).addEventListener('change', updateExportPreview));
+
+    function triggerDownload(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = url;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 3000);
+    }
+
+    $('btnDownloadExport').onclick = () => {
+      const format = exportFormatSelect.value;
+      const filename = exportFilenameInput.value.trim() || `${state.fileName}_palette.${EXPORT_EXT[format]}`;
+      if (format === 'png') {
+        renderPngPalette(state.swatches, pngOptions()).toBlob((blob) => triggerDownload(blob, filename), 'image/png');
+      } else {
+        triggerDownload(new Blob([exportText(format)], { type: EXPORT_MIME[format] }), filename);
+      }
+      closeModal('exportModal');
+      setStatusMessage(`Downloaded ${filename}`);
+    };
+
+    $('btnCopyExport').onclick = () => {
+      const format = exportFormatSelect.value;
+      if (format !== 'png') {
+        copyText(exportText(format), `Copied ${format.toUpperCase()} palette`);
+        closeModal('exportModal');
+        return;
+      }
+      renderPngPalette(state.swatches, pngOptions()).toBlob(async (blob) => {
+        try {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          setStatusMessage('Palette image copied to clipboard.');
+          closeModal('exportModal');
+        } catch (err) {
+          setStatusMessage('Clipboard copy failed: ' + err);
+        }
+      }, 'image/png');
+    };
+
+    // --- Modal Management, Menu & Hotkeys ---
+
+    document.querySelectorAll('[data-close]').forEach((btn) => {
+      btn.addEventListener('click', () => closeModal(btn.getAttribute('data-close')));
+    });
+    document.querySelectorAll('.modal-backdrop').forEach((backdrop) => {
+      backdrop.addEventListener('click', (e) => {
+        if (e.target === backdrop) closeModal(backdrop.id);
+      });
+    });
+
+    $('btnHotkeys').onclick = () => openModal('hotkeysModal');
+    $('btnAbout').onclick = () => openModal('aboutModal');
+
+    const menuDropdown = $('menuDropdown');
+    $('btnMenu').onclick = (e) => {
+      e.stopPropagation();
+      menuDropdown.classList.toggle('open');
+    };
+    document.addEventListener('click', (e) => {
+      if (!menuDropdown.contains(e.target)) menuDropdown.classList.remove('open');
+    });
+    menuDropdown.querySelectorAll('.dropdown-item').forEach((item) => {
+      item.addEventListener('click', () => menuDropdown.classList.remove('open'));
+    });
+
+    $('btnInspector').onclick = () => $('inspector').classList.toggle('open');
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-backdrop').forEach((m) => { m.style.display = 'none'; });
+        menuDropdown.classList.remove('open');
+        setEyedropper(false);
+        return;
+      }
+
+      if (e.target && e.target.matches && e.target.matches('input, textarea, select')) return;
+      // Enter on a focused button or link activates it rather than re-extracting
+      if (e.key === 'Enter' && e.target.closest && e.target.closest('button, a')) return;
+
+      const key = e.key.toLowerCase();
+      if (e.ctrlKey || e.metaKey) {
+        if (key === 'z') {
+          e.preventDefault();
+          restoreHistory(e.shiftKey ? 1 : -1);
+        } else if (key === 'y') {
+          e.preventDefault();
+          restoreHistory(1);
+        } else if (key === 'o') {
+          e.preventDefault();
+          $('btnOpen').click();
+        }
+        return;
+      }
+
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+        e.preventDefault();
+        openModal('hotkeysModal');
+      } else if (e.key === '1') {
+        setViewMode('side');
+      } else if (e.key === '3') {
+        setViewMode('result');
+      } else if (e.key === ' ') {
+        e.preventDefault();
+        toggleGridPeek();
+      } else if (key === 'r') {
+        zoomFit();
+      } else if (e.key === '+' || e.key === '=') {
+        zoomIn();
+      } else if (e.key === '-' || e.key === '_') {
+        zoomOut();
+      } else if (key === 't') {
+        $('btnTheme').click();
+      } else if (key === 'o') {
+        $('btnOpen').click();
+      } else if (key === 'e') {
+        $('btnExportModal').click();
+      } else if (key === 'i') {
+        if (!btnEyedropper.disabled) setEyedropper(!state.eyedropper);
+      } else if (key === 'c') {
+        copyAllHex();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        extract();
+      }
+    });
+
+    // Floating Help Tooltips
+    const floatingTooltipEl = $('floatingTooltip');
+    document.querySelectorAll('.help-tip').forEach((tip) => {
+      tip.addEventListener('mouseenter', () => {
+        floatingTooltipEl.textContent = tip.getAttribute('data-tip');
+        floatingTooltipEl.style.display = 'block';
+
+        const rect = tip.getBoundingClientRect();
+        let left = rect.right + 10;
+        let top = rect.top - 4;
+        const tipW = floatingTooltipEl.offsetWidth;
+        const tipH = floatingTooltipEl.offsetHeight;
+        if (left + tipW > window.innerWidth - 10) left = Math.max(10, rect.left - tipW - 10);
+        if (top + tipH > window.innerHeight - 10) top = Math.max(10, window.innerHeight - tipH - 10);
+        floatingTooltipEl.style.left = left + 'px';
+        floatingTooltipEl.style.top = top + 'px';
+      });
+      tip.addEventListener('mouseleave', () => {
+        floatingTooltipEl.style.display = 'none';
+      });
+    });
+    document.querySelector('.inspector-panels').addEventListener('scroll', () => {
+      floatingTooltipEl.style.display = 'none';
+    }, { passive: true });
+
+    // Initial Launch
+    updateLabels();
+    updateUndoRedoUI();
+    loadImageFromSource(SAMPLE_IMAGE_B64, 'sample');
+  </script>
+</body>
+</html>

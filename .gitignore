@@ -1,7 +1,17 @@
+# Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+.ruff_cache/
+.pytest_cache/
+
+# Virtual environments
+venv/
+.venv/
+
+# Editors & OS
+.vscode/
 .DS_Store
 Thumbs.db
-/.vscode/
+
+# Logs & scratch
+*.log
+.scratch/
