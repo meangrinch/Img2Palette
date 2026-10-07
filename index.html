@@ -95,6 +95,7 @@
       background: var(--bg-main);
       color: var(--text-main);
       height: 100vh;
+      height: 100dvh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -225,6 +226,8 @@
       display: flex;
       min-height: 0;
       position: relative;
+      /* Clips the off-canvas inspector, which would otherwise widen the mobile layout viewport */
+      overflow: hidden;
     }
     .inspector {
       order: 2;
@@ -525,6 +528,7 @@
     /* Viewport Work Area */
     .viewport-area {
       flex: 1;
+      touch-action: none;
       position: relative;
       overflow: hidden;
       cursor: grab;
@@ -579,15 +583,20 @@
     /* Side-by-Side Mode */
     .side-by-side-wrap {
       position: absolute;
-      transform-origin: center center;
-      display: flex;
-      gap: 16px;
-      align-items: center;
-      justify-content: center;
+      width: 0;
+      height: 0;
       user-select: none;
       image-rendering: pixelated;
       image-rendering: crisp-edges;
       --zoom: 1;
+    }
+
+    /* Positioned and scaled one by one in screen space by placeSideCards() */
+    .side-by-side-wrap > .side-by-side-card {
+      position: absolute;
+      left: 0;
+      top: 0;
+      transform-origin: 0 0;
     }
 
     .side-by-side-card {
@@ -847,6 +856,16 @@
     @media (max-width: 760px) {
       .stage-toolbar { flex-wrap: wrap; height: auto; padding: 6px 12px; }
       #btnSample { display: none; }
+      header { padding: 0 8px; }
+      .logo-title, .header-sep, .hud-credit { display: none; }
+      .header-actions { gap: 2px; }
+      .hud-metrics { overflow-x: auto; scrollbar-width: none; }
+      .status-panel { flex: none; white-space: nowrap; }
+      .inspector { width: min(300px, 85vw); min-width: 0; }
+    }
+    /* iOS zooms the whole page into any focused field smaller than 16px */
+    @media (pointer: coarse) {
+      select, input[type="text"], input[type="number"], textarea, .form-val-input { font-size: 16px; }
     }
 
     .about-head { display: flex; align-items: center; gap: 10px; }
@@ -949,7 +968,7 @@
 
           <div class="form-group">
             <div class="form-label-row">
-              <span class="form-label">Colors<span class="help-tip" data-tip="Number of colors extracted (1–256), locked colors included.">?</span></span>
+              <span class="form-label">Colors<span class="help-tip" data-tip="Number of colors extracted, locked colors included. Capped at 256, or at the image's own color count if lower.">?</span></span>
               <input type="number" class="form-val-input" id="valColorCount" value="9" min="1" max="256" step="1">
             </div>
             <input type="range" id="paramColorCount" min="1" max="256" step="1" value="9">
@@ -1147,7 +1166,7 @@
             <label class="form-label">Swatch Size<span class="help-tip" data-tip="Pixel size of each tile; 1px makes a lookup texture.">?</span></label>
             <select id="pngBlockSizeSelect">
               <option value="1">1px (Texture)</option>
-              <option value="16">16px</option>
+              <option value="8">8px</option>
               <option value="32" selected>32px</option>
               <option value="64">64px</option>
             </select>
@@ -1155,7 +1174,7 @@
           <label class="checkbox-label">
             <input type="checkbox" id="pngLabelsToggle">
             <span>Show hex labels</span>
-            <span class="help-tip" data-tip="Prints each hex code under its tile (16px swatches and up).">?</span>
+            <span class="help-tip" data-tip="Prints each hex code beside or under its tile (not on 1px textures).">?</span>
           </label>
         </div>
 
@@ -1198,6 +1217,7 @@
             <tr><td><kbd>Drag</kbd></td><td>Pan canvas viewport</td></tr>
             <tr><td><kbd>Middle Drag</kbd></td><td>Pan while the eyedropper is on</td></tr>
             <tr><td><kbd>Mouse Wheel</kbd></td><td>Zoom in / out</td></tr>
+            <tr><td><kbd>Pinch</kbd></td><td>Zoom in / out (touch)</td></tr>
             <tr><td><kbd>+</kbd> / <kbd>-</kbd></td><td>Zoom in / out</td></tr>
             <tr><td><kbd>R</kbd></td><td>Fit canvas to screen</td></tr>
             <tr><td><kbd>1</kbd> / <kbd>3</kbd></td><td>Side-by-Side / Palette view</td></tr>
@@ -2843,6 +2863,15 @@
     median: (pixels, k, locked) => buildMedianCutPalette(pixels, k, locked),
   };
 
+  // Distinct opaque colors in RGBA data, counting stops once past limit
+  function countColors(rgba, limit) {
+    const seen = new Set();
+    for (let i = 0; i < rgba.length && seen.size <= limit; i += 4) {
+      if (rgba[i + 3] >= 128) seen.add((rgba[i] << 16) | (rgba[i + 1] << 8) | rgba[i + 2]);
+    }
+    return seen.size;
+  }
+
   /**
    * Extract and sort a palette.
    * @param {Array|TypedArray} pixels RGBA bytes (or RGB / {r,g,b} arrays)
@@ -2915,6 +2944,7 @@
     gradientSort,
     sortPalette,
     extractPalette,
+    countColors,
     formatJsonPalette,
     formatGplPalette,
     formatCssPalette,
@@ -2989,6 +3019,12 @@
     const stylePresetSelect = $('stylePresetSelect');
     const paramColorCount = $('paramColorCount');
     const valColorCount = $('valColorCount');
+    // The count asked for; an image with fewer colors only caps the slider, so the next image gets it back
+    let requestedColors = DEFAULTS.colors;
+    function setColorCount(n) {
+      requestedColors = Math.min(256, Math.max(1, n));
+      paramColorCount.value = requestedColors;
+    }
     const quantizerAlgorithmSelect = $('quantizerAlgorithmSelect');
     const extractionModeSelect = $('extractionModeSelect');
     const samplingQualitySelect = $('samplingQualitySelect');
@@ -3072,6 +3108,11 @@
         state.sourceCanvas.width = img.naturalWidth;
         state.sourceCanvas.height = img.naturalHeight;
         sourceCtx.drawImage(img, 0, 0);
+        // The slider can't ask for more colors than the image holds
+        const cap = String(Math.max(1, PaletteEngine.countColors(sourceCtx.getImageData(0, 0, img.naturalWidth, img.naturalHeight).data, 255)));
+        paramColorCount.max = valColorCount.max = cap;
+        paramColorCount.value = requestedColors;
+        updateLabels();
 
         mainCanvas.width = img.naturalWidth;
         mainCanvas.height = img.naturalHeight;
@@ -3345,6 +3386,7 @@
       }
       sidePaletteCard.style.width = `${w}px`;
       sidePaletteCard.style.height = `${h}px`;
+      placeSideCards();
     }
 
     function toggleGridPeek() {
@@ -3446,10 +3488,31 @@
 
     // --- Interactive Viewport & Pan / Zoom ---
 
+    // Low enough that two very large images (e.g. 11k px wide) still fit side by side
+    const MIN_ZOOM = 0.01;
+
+    // On-screen gap between side-by-side cards
+    const SIDE_GAP = 16;
+
+    // Each card gets its own screen-space transform, centered on the pan point. Scaling one wrapper around
+    // both cards made it as wide as both images, and Chrome stops painting a scaled layer's content ~16k
+    // pre-zoom pixels in (two 11k-px photos lost half the right one); it also keeps the gap free of the
+    // fractional layout offsets the browser would snap and the zoom would magnify
+    function placeSideCards() {
+      const z = state.zoom;
+      const cards = [...sideBySideWrap.children].filter((c) => c.style.display !== 'none');
+      const total = cards.reduce((sum, c) => sum + c.offsetWidth * z, 0) + SIDE_GAP * (cards.length - 1);
+      let x = state.panX - total / 2;
+      for (const c of cards) {
+        c.style.transform = `translate(${x}px, ${state.panY - c.offsetHeight * z / 2}px) scale(${z})`;
+        x += c.offsetWidth * z + SIDE_GAP;
+      }
+      sideBySideWrap.style.setProperty('--zoom', z);
+    }
+
     function updateTransform() {
       zoomLevelText.textContent = `${Math.round(state.zoom * 100)}%`;
-      sideBySideWrap.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
-      sideBySideWrap.style.setProperty('--zoom', state.zoom);
+      placeSideCards();
       renderPixelGrid();
       updateOverlays();
     }
@@ -3467,7 +3530,10 @@
         label.style.display = visible ? 'block' : 'none';
         if (!visible) return;
         // Sits on top of the card, sticking to the viewport top once zoomed past it
-        const top = Math.max(vpRect.top, r.top - label.offsetHeight);
+        // Bottom edge on a whole device pixel about one CSS pixel past the card's top: the card's first rows
+        // paint antialiased, and an exact edge left a seam of 1-2 device pixels, worst on scaled displays
+        const dpr = window.devicePixelRatio || 1;
+        const top = Math.max(vpRect.top, (Math.ceil(r.top * dpr) + Math.ceil(dpr)) / dpr - label.offsetHeight);
         label.style.left = `${left - vpRect.left}px`;
         label.style.width = `${right - left}px`;
         label.style.top = `${top - vpRect.top}px`;
@@ -3475,11 +3541,16 @@
     }
 
     function zoomAt(zoomFactor, clientX, clientY) {
-      const newZoom = Math.max(0.05, Math.min(32.0, state.zoom * zoomFactor));
+      const newZoom = Math.max(MIN_ZOOM, Math.min(32.0, state.zoom * zoomFactor));
       if (newZoom === state.zoom) return;
       const rect = viewportArea.getBoundingClientRect();
-      const mouseX = clientX - rect.left - rect.width / 2;
+      let mouseX = clientX - rect.left - rect.width / 2;
       const mouseY = clientY - rect.top - rect.height / 2;
+      // The side-by-side gap is fixed on screen, so each card sits half of it off the scaled layout
+      if (state.viewMode === 'side') {
+        const gapMid = sideBySideWrap.firstElementChild.getBoundingClientRect().right + SIDE_GAP / 2;
+        mouseX -= Math.sign(clientX - gapMid) * SIDE_GAP / 2;
+      }
       const effectiveFactor = newZoom / state.zoom;
       state.panX -= (mouseX - state.panX) * (effectiveFactor - 1);
       state.panY -= (mouseY - state.panY) * (effectiveFactor - 1);
@@ -3493,7 +3564,7 @@
     }
 
     function zoomOut() {
-      state.zoom = Math.max(0.05, state.zoom * 0.8);
+      state.zoom = Math.max(MIN_ZOOM, state.zoom * 0.8);
       updateTransform();
     }
 
@@ -3507,13 +3578,13 @@
       }
       const w = sidePaletteCard.offsetWidth;
       const h = sidePaletteCard.offsetHeight;
-      // Side-by-side: two equal cards with a 16px gap; title labels sit above them in screen space, so reserve
+      // Side-by-side: two equal cards with a fixed on-screen gap; title labels sit above them in screen space, so reserve
       // room for them. Palette view: the palette card alone, unlabeled.
       const fitScale = state.viewMode === 'side'
-        ? Math.min(vpW / (w * 2 + 16), Math.max(1, vpH - 26) / h)
+        ? Math.min((vpW - SIDE_GAP) / (w * 2), Math.max(1, vpH - 26) / h)
         : Math.min(vpW / w, vpH / h);
       // Floor to integer percentage so zoom never exceeds viewport bounds
-      state.zoom = Math.max(0.05, Math.min(32.0, Math.floor(fitScale * 100) / 100));
+      state.zoom = Math.max(MIN_ZOOM, Math.min(32.0, Math.floor(fitScale * 100) / 100));
       state.panX = 0;
       state.panY = 0;
       updateTransform();
@@ -3587,15 +3658,57 @@
       zoomAt(e.deltaY < 0 ? 1.2 : 0.833, e.clientX, e.clientY);
     }, { passive: false });
 
-    viewportArea.addEventListener('mousedown', (e) => {
+    // Touch points on the viewport; two at once pinch-zoom (and pan) about their midpoint
+    const pinch = new Map();
+    let pinchDist = 0;
+    let pinchX = 0;
+    let pinchY = 0;
+
+    function pinchMove() {
+      const [a, b] = pinch.values();
+      const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      const x = (a.clientX + b.clientX) / 2;
+      const y = (a.clientY + b.clientY) / 2;
+      if (pinchDist && dist) {
+        state.panX += x - pinchX;
+        state.panY += y - pinchY;
+        const zoom = state.zoom;
+        zoomAt(dist / pinchDist, x, y);
+        // zoomAt redraws only when the zoom changed; at a zoom limit the midpoint pan still needs one
+        if (state.zoom === zoom) updateTransform();
+      }
+      pinchDist = dist;
+      pinchX = x;
+      pinchY = y;
+    }
+
+    // A touch samples on lift rather than on contact, so a second finger starting a pinch can cancel it
+    let pendingPick = null;
+
+    function pickAt(coords) {
+      const px = getPixelAt(coords.x, coords.y);
+      addSwatch(px);
+      setStatusMessage(`Added ${px.hex.toUpperCase()} to the palette`);
+    }
+
+    viewportArea.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'touch') {
+        pinch.set(e.pointerId, e);
+        if (pinch.size >= 2) {
+          state.isPanning = false;
+          pendingPick = null;
+          pinchDist = 0;
+          pinchMove();
+          return;
+        }
+      }
       if (e.button !== 0 && e.button !== 1) return;
       state.dragMoved = false;
       if (e.button === 0 && state.eyedropper) {
         const coords = imageCoordsAt(e);
         if (coords) {
-          const px = getPixelAt(coords.x, coords.y);
-          addSwatch(px);
-          setStatusMessage(`Added ${px.hex.toUpperCase()} to the palette`);
+          if (e.pointerType === 'touch') pendingPick = coords;
+          else pickAt(coords);
           return;
         }
       }
@@ -3606,7 +3719,11 @@
       viewportArea.classList.add('panning');
     });
 
-    window.addEventListener('mousemove', (e) => {
+    window.addEventListener('pointermove', (e) => {
+      if (pinch.has(e.pointerId)) {
+        pinch.set(e.pointerId, e);
+        if (pinch.size >= 2) return pinchMove();
+      }
       if (state.isPanning) {
         // Apply movement deltas so zooming (which also moves pan) mid-drag doesn't snap back
         state.panX += e.clientX - state.panLastX;
@@ -3620,10 +3737,15 @@
       if (state.eyedropper) updateLoupe(e);
     });
 
-    window.addEventListener('mouseup', () => {
+    function endDrag(e) {
+      if (e.type === 'pointerup' && pendingPick) pickAt(pendingPick);
+      pendingPick = null;
+      pinch.delete(e.pointerId);
       state.isPanning = false;
       viewportArea.classList.remove('panning');
-    });
+    }
+    window.addEventListener('pointerup', endDrag);
+    window.addEventListener('pointercancel', endDrag);
 
     window.addEventListener('resize', () => {
       if (state.image) zoomFit();
@@ -3706,12 +3828,13 @@
     }
 
     paramColorCount.addEventListener('input', () => {
+      requestedColors = parseInt(paramColorCount.value, 10);
       updateLabels();
       scheduleExtract();
     });
     valColorCount.addEventListener('change', () => {
       const n = parseInt(valColorCount.value, 10);
-      if (!Number.isNaN(n)) paramColorCount.value = Math.min(256, Math.max(1, n));
+      if (!Number.isNaN(n)) setColorCount(n);
       updateLabels();
       scheduleExtract();
     });
@@ -3727,7 +3850,7 @@
     });
 
     function applyDefaults() {
-      paramColorCount.value = DEFAULTS.colors;
+      setColorCount(DEFAULTS.colors);
       quantizerAlgorithmSelect.value = DEFAULTS.quantizer;
       extractionModeSelect.value = DEFAULTS.mode;
       samplingQualitySelect.value = DEFAULTS.sampling;
@@ -3737,7 +3860,7 @@
 
     // Presets only choose a color count, so "None" restores just the default count
     stylePresetSelect.addEventListener('change', () => {
-      paramColorCount.value = stylePresetSelect.value || DEFAULTS.colors;
+      setColorCount(parseInt(stylePresetSelect.value, 10) || DEFAULTS.colors);
       updateLabels();
       extract();
     });
@@ -3840,18 +3963,24 @@
       };
     }
 
+    const LABEL_FONT = '9px monospace';
+
     function renderPngPalette(swatches, { layout, blockSize, showLabels }) {
-      const labels = showLabels && blockSize >= 16;
+      const labels = showLabels && blockSize > 1;
       const n = Math.max(1, swatches.length);
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
+      ctx.font = LABEL_FONT;
+      // Labels wider than their tile would run into the neighbors' labels, so the cell grows to fit
+      const labelW = labels ? Math.ceil(ctx.measureText('#FFFFFF').width) + 8 : 0;
       let tileW = blockSize;
       let tileH = blockSize;
       let place;
       if (layout === 'strip_v') {
+        const rowH = labels ? Math.max(blockSize, 12) : blockSize;
         canvas.width = blockSize + (labels ? 64 : 0);
-        canvas.height = n * blockSize;
-        place = (i) => ({ x: 0, y: i * blockSize, lx: blockSize + 6, ly: i * blockSize + blockSize / 2, align: 'left' });
+        canvas.height = n * rowH;
+        place = (i) => ({ x: 0, y: i * rowH, lx: blockSize + 6, ly: i * rowH + rowH / 2, align: 'left' });
       } else {
         const cols = layout === 'grid' ? Math.ceil(Math.sqrt(n)) : layout === 'preview' ? gridColumns(n) : n;
         if (layout === 'preview') {
@@ -3862,18 +3991,20 @@
           if (aspect >= 1) tileW = Math.round(blockSize * aspect);
           else tileH = Math.round(blockSize / aspect);
         }
+        const cellW = Math.max(tileW, labelW);
         const cellH = tileH + (labels ? 14 : 0);
-        canvas.width = cols * tileW;
+        canvas.width = cols * cellW;
         canvas.height = Math.ceil(n / cols) * cellH;
         place = (i) => {
-          const x = (i % cols) * tileW;
+          const x = (i % cols) * cellW;
           const y = Math.floor(i / cols) * cellH;
-          return { x, y, lx: x + tileW / 2, ly: y + tileH + 7, align: 'center' };
+          return { x: x + Math.floor((cellW - tileW) / 2), y, lx: x + cellW / 2, ly: y + tileH + 7, align: 'center' };
         };
       }
       ctx.fillStyle = '#1c1a26';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.font = '9px monospace';
+      // Resizing the canvas reset the context, font included
+      ctx.font = LABEL_FONT;
       ctx.textBaseline = 'middle';
       swatches.forEach((s, i) => {
         const p = place(i);
@@ -3999,6 +4130,22 @@
     });
 
     $('btnInspector').onclick = () => $('inspector').classList.toggle('open');
+
+    // Themed (base-select) dropdowns open their list on Up/Down; step the value instead, like a native select
+    if (CSS.supports('appearance', 'base-select')) {
+      document.addEventListener('keydown', (e) => {
+        const sel = e.target;
+        if (!(sel instanceof HTMLSelectElement) || e.altKey || sel.matches(':open')) return;
+        const step = { ArrowDown: 1, ArrowUp: -1 }[e.key];
+        if (!step) return;
+        e.preventDefault();
+        const i = sel.selectedIndex + step;
+        if (i < 0 || i >= sel.options.length) return;
+        sel.selectedIndex = i;
+        sel.dispatchEvent(new Event('input', { bubbles: true }));
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    }
 
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {

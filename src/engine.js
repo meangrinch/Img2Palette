@@ -1578,6 +1578,15 @@
     median: (pixels, k, locked) => buildMedianCutPalette(pixels, k, locked),
   };
 
+  // Distinct opaque colors in RGBA data, counting stops once past limit
+  function countColors(rgba, limit) {
+    const seen = new Set();
+    for (let i = 0; i < rgba.length && seen.size <= limit; i += 4) {
+      if (rgba[i + 3] >= 128) seen.add((rgba[i] << 16) | (rgba[i + 1] << 8) | rgba[i + 2]);
+    }
+    return seen.size;
+  }
+
   /**
    * Extract and sort a palette.
    * @param {Array|TypedArray} pixels RGBA bytes (or RGB / {r,g,b} arrays)
@@ -1650,6 +1659,7 @@
     gradientSort,
     sortPalette,
     extractPalette,
+    countColors,
     formatJsonPalette,
     formatGplPalette,
     formatCssPalette,

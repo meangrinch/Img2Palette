@@ -391,4 +391,13 @@ const isBlue = (c) => c.b > 200 && c.r < 50;
   console.log('  Passed!');
 }
 
+{
+  console.log('Test: countColors counts distinct opaque colors and stops past the limit');
+  const px = new Uint8ClampedArray([255, 0, 0, 255, 255, 0, 0, 255, 0, 0, 255, 255, 0, 255, 0, 0]);
+  assert.strictEqual(PaletteEngine.countColors(px, 255), 2, 'duplicate and transparent pixels ignored');
+  const ramp = new Uint8ClampedArray(300 * 4).map((_, i) => (i % 4 === 3 ? 255 : Math.floor(i / 4)));
+  assert.strictEqual(PaletteEngine.countColors(ramp, 255), 256);
+  console.log('  Passed!');
+}
+
 console.log('All unit tests passed successfully!');
