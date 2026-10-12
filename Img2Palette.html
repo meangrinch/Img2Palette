@@ -4085,22 +4085,22 @@
       setStatusMessage(`Downloaded ${filename}`);
     };
 
-    $('btnCopyExport').onclick = () => {
+    $('btnCopyExport').onclick = async () => {
       const format = exportFormatSelect.value;
       if (format !== 'png') {
         copyText(exportText(format), `Copied ${format.toUpperCase()} palette`);
         closeModal('exportModal');
         return;
       }
-      renderPngPalette(state.swatches, pngOptions()).toBlob(async (blob) => {
-        try {
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-          setStatusMessage('Palette image copied to clipboard.');
-          closeModal('exportModal');
-        } catch (err) {
-          setStatusMessage('Clipboard copy failed: ' + err);
-        }
-      }, 'image/png');
+      // Safari only allows the write during the click itself, so it gets the blob as a promise
+      const blob = new Promise(resolve => renderPngPalette(state.swatches, pngOptions()).toBlob(resolve, 'image/png'));
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        setStatusMessage('Palette image copied to clipboard.');
+        closeModal('exportModal');
+      } catch (err) {
+        setStatusMessage('Clipboard copy failed: ' + err);
+      }
     };
 
     // --- Modal Management, Menu & Hotkeys ---

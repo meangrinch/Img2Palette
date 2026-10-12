@@ -5,7 +5,6 @@
 
 <p align="center">
   <img src="https://img.shields.io/github/v/release/meangrinch/Img2Palette?label=Release&labelColor=181717&color=0877d2" />
-  <img src="https://img.shields.io/github/downloads/meangrinch/Img2Palette/total?label=Downloads&labelColor=181717&color=0877d2" />
   <img src="https://img.shields.io/github/license/meangrinch/Img2Palette?labelColor=181717&color=2ea44f" />
   <img src="https://img.shields.io/badge/JavaScript-181717?logo=javascript&logoColor=F7DF1E" />
 </p>
@@ -33,7 +32,7 @@ Use the hosted version directly in your browser [here](https://meangrinch.github
 
 ### 2. Standalone (Offline)
 
-Download `Img2Palette.html` from [Releases](https://github.com/meangrinch/Img2Palette/releases) or the repository root and open it in any browser.
+Download `Img2Palette.html` from the repository root and open it in any browser.
 
 ### 3. From Source
 
